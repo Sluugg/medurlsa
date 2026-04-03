@@ -15,6 +15,10 @@ const DEFAULT_CONFIG = {
     flavor_text: { interval_min_s: 12, interval_max_s: 25, duration_ms: 4000 },
     logo_flash:  { interval_min_s: 20, interval_max_s: 60, duration_ms: 3000 },
   },
+  fonts: {
+    title:       { family: "'VCROSDMono', 'Courier New', monospace", size: '1.25rem', weight: 'bold' },
+    flavor_text: { family: "'VCROSDMono', 'Courier New', monospace", size: '0.7rem',  weight: 'normal' },
+  },
 }
 
 let _cache   = null

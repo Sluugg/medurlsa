@@ -13,6 +13,18 @@ _DEFAULTS: dict = {
     "site_title": "dopelink",
     "logo_path":  None,
     "flavor_texts": [],
+    "fonts": {
+        "title": {
+            "family": "'VCROSDMono', 'Courier New', monospace",
+            "size":   "1.25rem",
+            "weight": "bold",
+        },
+        "flavor_text": {
+            "family": "'VCROSDMono', 'Courier New', monospace",
+            "size":   "0.7rem",
+            "weight": "normal",
+        },
+    },
     "timing": {
         "glitch": {
             "interval_min_s": 8,

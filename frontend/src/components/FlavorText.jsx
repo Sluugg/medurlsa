@@ -28,7 +28,7 @@ function randomPos() {
 
 const FADE_MS = 600
 
-export default function FlavorText({ texts, timing }) {
+export default function FlavorText({ texts, timing, fonts }) {
   const [visible, setVisible] = useState(false)
   const [opacity, setOpacity] = useState(0)
   const [text, setText]       = useState('')
@@ -36,6 +36,7 @@ export default function FlavorText({ texts, timing }) {
   const tid = useRef(null)
 
   const ft = timing?.flavor_text ?? {}
+  const ff = fonts?.flavor_text  ?? {}
 
   useEffect(() => {
     if (!texts || texts.length === 0) return
@@ -80,8 +81,9 @@ export default function FlavorText({ texts, timing }) {
         left:        pos.left,
         opacity,
         transition:  `opacity ${FADE_MS}ms ease`,
-        fontFamily:  "'VCROSDMono', 'Courier New', monospace",
-        fontSize:    '0.7rem',
+        fontFamily:  ff.family ?? "'VCROSDMono', 'Courier New', monospace",
+        fontSize:    ff.size   ?? '0.7rem',
+        fontWeight:  ff.weight ?? 'normal',
         color:       '#c0b8ff',
         textShadow:  '0 0 8px rgba(192, 184, 255, 0.7)',
         pointerEvents: 'none',

@@ -40,6 +40,7 @@ async def get_public_config():
         "flavor_texts":          CONTENT_CONFIG.get("flavor_texts", []),
         "available_backgrounds": available_backgrounds,
         "timing":                CONTENT_CONFIG.get("timing", {}),
+        "fonts":                 CONTENT_CONFIG.get("fonts", {}),
     }
 
 

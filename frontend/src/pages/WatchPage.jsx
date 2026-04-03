@@ -115,7 +115,7 @@ export default function WatchPage() {
           }}
         >
           {/* Title banner with glitch + color cycle */}
-          <TitleBanner siteTitle={config.site_title} timing={config.timing} />
+          <TitleBanner siteTitle={config.site_title} timing={config.timing} fonts={config.fonts} />
 
           {/* Media title */}
           <h1 className="text-2xl font-bold text-white truncate">{media.item_title}</h1>
@@ -147,7 +147,7 @@ export default function WatchPage() {
       {/* z-20 — floating flavor overlays (flavor_enabled only) */}
       {flavorEnabled && (
         <>
-          <FlavorText texts={flavorTexts}     timing={config.timing} />
+          <FlavorText texts={flavorTexts}     timing={config.timing} fonts={config.fonts} />
           <LogoFlash  hasLogo={config.has_logo} timing={config.timing} />
         </>
       )}

@@ -1,27 +1,28 @@
 /**
- * TitleBanner — displays the site title in VCR OSD Mono with two independent
- * timed effects driven by content_config timing values:
+ * TitleBanner — displays the site title with two independent timed effects:
  *
  *   Glitch:      CSS vhsGlitch animation, triggered at random intervals.
  *                Hard RGB channel-separation + clip-path horizontal tears.
  *
- *   Color cycle: JS setInterval stepping through the synthwave palette,
+ *   Color cycle: CSS colorCycle animation for smooth gradated color shifting,
  *                triggered at random intervals and running for duration_ms.
+ *
+ * Font family, size, and weight are driven by the fonts.title config.
+ * The border fits the text width rather than spanning the full parent.
  */
-import { useEffect, useRef, useState } from 'react'
-
-const PALETTE = ['#ff00ff', '#00ffff', '#ff6ec7', '#ffff00', '#bf00ff', '#ffffff']
+import { useEffect, useState } from 'react'
 
 function rand(min, max) {
   return min + Math.random() * (max - min)
 }
 
-export default function TitleBanner({ siteTitle, timing }) {
-  const [glitching, setGlitching]   = useState(false)
-  const [cycleColor, setCycleColor] = useState(null)
+export default function TitleBanner({ siteTitle, timing, fonts }) {
+  const [glitching, setGlitching] = useState(false)
+  const [isCycling, setIsCycling] = useState(false)
 
   const gt = timing?.glitch      ?? {}
   const ct = timing?.color_cycle ?? {}
+  const tf = fonts?.title        ?? {}
 
   // ── Glitch loop ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -44,55 +45,57 @@ export default function TitleBanner({ siteTitle, timing }) {
   }, [gt.interval_min_s, gt.interval_max_s, gt.duration_ms])
 
   // ── Color cycle loop ─────────────────────────────────────────────────────────
+  // Uses CSS colorCycle animation for smooth gradated shifts — no JS color stepping.
   useEffect(() => {
-    let tid, iid
+    let tid
     function schedule() {
       const delay = rand(
         (ct.interval_min_s ?? 15) * 1000,
         (ct.interval_max_s ?? 40) * 1000,
       )
       tid = setTimeout(() => {
-        let idx = 0
-        iid = setInterval(() => {
-          setCycleColor(PALETTE[idx % PALETTE.length])
-          idx++
-        }, ct.rate_ms ?? 300)
-
+        setIsCycling(true)
         tid = setTimeout(() => {
-          clearInterval(iid)
-          setCycleColor(null)
+          setIsCycling(false)
           schedule()
         }, ct.duration_ms ?? 3000)
       }, delay)
     }
     schedule()
-    return () => { clearTimeout(tid); clearInterval(iid) }
-  }, [ct.interval_min_s, ct.interval_max_s, ct.duration_ms, ct.rate_ms])
+    return () => clearTimeout(tid)
+  }, [ct.interval_min_s, ct.interval_max_s, ct.duration_ms])
 
   const glitchDuration = gt.duration_ms ?? 400
+  const cycleDuration  = ct.duration_ms ?? 3000
+
+  // Build animation string: glitch and cycle are independent — both can be active.
+  const animations = [
+    glitching ? `vhsGlitch ${glitchDuration}ms steps(1) forwards` : null,
+    isCycling ? `colorCycle ${cycleDuration}ms linear forwards`    : null,
+  ].filter(Boolean).join(', ') || 'none'
 
   return (
-    <div
-      className="w-full rounded px-4 py-2 text-center"
-      style={{
-        border:          '1px solid rgba(191, 95, 255, 0.5)',
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
-      }}
-    >
+    <div className="w-full flex justify-center">
       <div
+        className="inline-block rounded px-4 py-2"
         style={{
-          fontFamily: "'VCROSDMono', 'Courier New', monospace",
-          fontSize:   '1.25rem',
-          fontWeight: 'bold',
-          letterSpacing: '0.15em',
-          userSelect: 'none',
-          color:      cycleColor ?? '#ffffff',
-          animation:  glitching
-            ? `vhsGlitch ${glitchDuration}ms steps(1) forwards`
-            : 'none',
+          border:          '1px solid rgba(191, 95, 255, 0.5)',
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
         }}
       >
-        {siteTitle ?? 'dopelink'}
+        <div
+          style={{
+            fontFamily:    tf.family ?? "'VCROSDMono', 'Courier New', monospace",
+            fontSize:      tf.size   ?? '1.25rem',
+            fontWeight:    tf.weight ?? 'bold',
+            letterSpacing: '0.15em',
+            userSelect:    'none',
+            color:         isCycling ? undefined : '#ffffff',
+            animation:     animations,
+          }}
+        >
+          {siteTitle ?? 'dopelink'}
+        </div>
       </div>
     </div>
   )
