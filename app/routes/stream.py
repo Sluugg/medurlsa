@@ -124,19 +124,37 @@ async def get_cover_art(uuid: str, db: Connection = Depends(get_db)):
     if not link["is_active"] or _is_expired(link["expires_at"]):
         raise HTTPException(status_code=410, detail="Link unavailable.")
 
-    # ── 2. Fetch primary image from Jellyfin ──────────────────────────────────
-    image_url = (
-        f"{JELLYFIN_URL}/Items/{link['item_id']}/Images/Primary"
-        f"?api_key={JELLYFIN_API_KEY}"
-    )
+    # ── 2. Fetch item data to get the Primary image tag ───────────────────────
+    # Jellyfin requires the image etag ('tag' param) to serve the image in most
+    # configurations — requesting without it returns 404 even when art exists.
     async with httpx.AsyncClient() as client:
-        r = await client.get(image_url, timeout=10.0)
+        item_r = await client.get(
+            f"{JELLYFIN_URL}/Items",
+            params={"Ids": link["item_id"], "Fields": "ImageTags", "api_key": JELLYFIN_API_KEY},
+            timeout=10.0,
+        )
+        item_r.raise_for_status()
+        items = item_r.json().get("Items", [])
 
-    if r.status_code == 404:
+        if not items:
+            raise HTTPException(status_code=404, detail="No cover art available.")
+
+        primary_tag = items[0].get("ImageTags", {}).get("Primary")
+        if not primary_tag:
+            raise HTTPException(status_code=404, detail="No cover art available.")
+
+        # ── 3. Fetch the image using the tag ──────────────────────────────────
+        image_r = await client.get(
+            f"{JELLYFIN_URL}/Items/{link['item_id']}/Images/Primary",
+            params={"tag": primary_tag, "api_key": JELLYFIN_API_KEY},
+            timeout=10.0,
+        )
+
+    if image_r.status_code == 404:
         raise HTTPException(status_code=404, detail="No cover art available.")
-    r.raise_for_status()
+    image_r.raise_for_status()
 
     return Response(
-        content=r.content,
-        media_type=r.headers.get("content-type", "image/jpeg"),
+        content=image_r.content,
+        media_type=image_r.headers.get("content-type", "image/jpeg"),
     )
