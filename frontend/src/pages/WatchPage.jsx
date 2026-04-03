@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import VideoPlayer from '../components/VideoPlayer'
+import VideoPlayer   from '../components/VideoPlayer'
+import Background    from '../components/Background'
+import TitleBanner   from '../components/TitleBanner'
+import FlavorText    from '../components/FlavorText'
+import LogoFlash     from '../components/LogoFlash'
+import useConfig     from '../hooks/useConfig'
 
 const STATUS_MESSAGES = {
   not_found:    'This link does not exist.',
@@ -22,21 +27,28 @@ function getOrCreateClientId() {
 
 function formatExpiry(expiresAt) {
   if (!expiresAt) return null
-  const d = new Date(expiresAt + 'Z') // treat stored value as UTC
-  return d.toLocaleString()
+  return new Date(expiresAt + 'Z').toLocaleString()
+}
+
+function pickBackground(mediaBackground, availableBackgrounds) {
+  if (mediaBackground) return mediaBackground
+  if (!availableBackgrounds || availableBackgrounds.length === 0) return null
+  return availableBackgrounds[Math.floor(Math.random() * availableBackgrounds.length)]
 }
 
 export default function WatchPage() {
-  const { uuid } = useParams()
-  const [phase, setPhase] = useState('loading') // loading | ok | <error-status>
-  const [media, setMedia] = useState(null)
-  const [clientId] = useState(getOrCreateClientId)
+  const { uuid }              = useParams()
+  const [phase, setPhase]     = useState('loading')
+  const [media, setMedia]     = useState(null)
+  const [clientId]            = useState(getOrCreateClientId)
+  const [bgFile, setBgFile]   = useState(null)
+  const { config }            = useConfig()
 
   useEffect(() => {
     fetch(`/api/links/${uuid}/register`, {
-      method: 'POST',
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client_id: clientId }),
+      body:    JSON.stringify({ client_id: clientId }),
     })
       .then(r => r.json())
       .then(data => {
@@ -50,6 +62,18 @@ export default function WatchPage() {
       .catch(() => setPhase('error'))
   }, [uuid, clientId])
 
+  // Pick background once we have both media info and the available list
+  useEffect(() => {
+    if (media && config) {
+      setBgFile(pickBackground(media.background, config.available_backgrounds))
+    }
+  }, [media, config])
+
+  // Flavor text: link-level override wraps in array, else use global pool
+  const flavorTexts    = media?.flavor_text ? [media.flavor_text] : config.flavor_texts
+  const flavorEnabled  = media?.flavor_enabled ?? false
+
+  // ── Loading ────────────────────────────────────────────────────────────────
   if (phase === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -58,50 +82,75 @@ export default function WatchPage() {
     )
   }
 
+  // ── Error ──────────────────────────────────────────────────────────────────
   if (phase !== 'ok') {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
-        <div className="text-center space-y-2">
-          <p className="text-2xl text-red-400 font-semibold">
-            {STATUS_MESSAGES[phase] ?? STATUS_MESSAGES.error}
-          </p>
-        </div>
+        <p className="text-xl text-red-400 font-semibold text-center">
+          {STATUS_MESSAGES[phase] ?? STATUS_MESSAGES.error}
+        </p>
       </div>
     )
   }
 
+  // ── Player ─────────────────────────────────────────────────────────────────
   const streamUrl = `/api/stream/${uuid}?client_id=${encodeURIComponent(clientId)}`
-  const isVideo = media.item_type !== 'Audio'
-  const expiry = formatExpiry(media.expires_at)
+  const isVideo   = media.item_type !== 'Audio'
+  const expiry    = formatExpiry(media.expires_at)
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-start px-4 py-8 max-w-4xl mx-auto w-full">
-      <div className="w-full space-y-4">
-        {/* Title */}
-        <h1 className="text-2xl font-bold text-white truncate">{media.item_title}</h1>
+    <div className="min-h-screen relative">
 
-        {/* Album art (audio only) */}
-        {!isVideo && (
-          <div className="flex justify-center">
-            <img
-              src={`/api/image/${uuid}`}
-              alt="Cover art"
-              className="w-64 h-64 object-cover rounded-lg shadow-xl"
-              onError={e => { e.target.style.display = 'none' }}
-            />
-          </div>
-        )}
+      {/* z-0 — fullscreen background */}
+      {flavorEnabled && <Background filename={bgFile} />}
 
-        {/* Player */}
-        <VideoPlayer streamUrl={streamUrl} isVideo={isVideo} />
+      {/* z-10 — content card */}
+      <div className="relative z-10 flex flex-col items-center justify-start px-4 py-8 min-h-screen">
+        <div
+          className="w-full max-w-4xl space-y-4 rounded-xl p-4"
+          style={{
+            backgroundColor: 'rgba(5, 2, 18, 0.75)',
+            backdropFilter:  'blur(6px)',
+            border:          '1px solid rgba(80, 40, 120, 0.35)',
+          }}
+        >
+          {/* Title banner with glitch + color cycle */}
+          <TitleBanner siteTitle={config.site_title} timing={config.timing} />
 
-        {/* Expiry notice */}
-        {expiry && (
-          <p className="text-sm text-gray-500 text-center">
-            This link expires on {expiry}.
-          </p>
-        )}
+          {/* Media title */}
+          <h1 className="text-2xl font-bold text-white truncate">{media.item_title}</h1>
+
+          {/* Album art — audio only */}
+          {!isVideo && (
+            <div className="flex justify-center">
+              <img
+                src={`/api/image/${uuid}`}
+                alt="Cover art"
+                className="w-64 h-64 object-cover rounded-lg shadow-xl"
+                onError={e => { e.target.style.display = 'none' }}
+              />
+            </div>
+          )}
+
+          {/* Player */}
+          <VideoPlayer streamUrl={streamUrl} isVideo={isVideo} />
+
+          {/* Expiry notice */}
+          {expiry && (
+            <p className="text-sm text-gray-500 text-center">
+              This link expires on {expiry}.
+            </p>
+          )}
+        </div>
       </div>
+
+      {/* z-20 — floating flavor overlays (flavor_enabled only) */}
+      {flavorEnabled && (
+        <>
+          <FlavorText texts={flavorTexts}     timing={config.timing} />
+          <LogoFlash  hasLogo={config.has_logo} timing={config.timing} />
+        </>
+      )}
     </div>
   )
 }

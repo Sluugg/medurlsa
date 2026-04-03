@@ -2,6 +2,79 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Synthwave color palette ─────────────────────────────────────────────── */
+:root {
+  --sw-magenta: #ff00ff;
+  --sw-cyan:    #00ffff;
+  --sw-pink:    #ff6ec7;
+  --sw-yellow:  #ffff00;
+  --sw-purple:  #bf00ff;
+  --sw-white:   #ffffff;
+}
+
+/* ── VCR OSD Mono font ───────────────────────────────────────────────────── */
+/* Place VCROSDMono.woff2 and VCROSDMono.ttf in frontend/public/fonts/       */
+/* font-display: swap means it falls back immediately if the file is missing  */
+@font-face {
+  font-family: 'VCROSDMono';
+  src: url('/fonts/VCROSDMono.woff2') format('woff2'),
+       url('/fonts/VCROSDMono.ttf')   format('truetype');
+  font-weight: normal;
+  font-style:  normal;
+  font-display: swap;
+}
+
 body {
   @apply bg-gray-950 text-gray-100 min-h-screen;
+}
+
+/* ── VHS Glitch keyframe ─────────────────────────────────────────────────── */
+/* RGB channel separation via text-shadow + clip-path horizontal slice tears  */
+/* Using steps(1) for a hard digital-artifact look rather than smooth tweens  */
+@keyframes vhsGlitch {
+  0%,  19% { text-shadow: none; clip-path: none; transform: none; }
+
+  20% {
+    text-shadow: -3px 0 var(--sw-cyan), 3px 0 var(--sw-magenta);
+    clip-path: polygon(0 12%, 100% 12%, 100% 28%, 0 28%);
+    transform: translate(-2px, 0);
+  }
+  22% {
+    text-shadow: 3px 0 var(--sw-cyan), -3px 0 var(--sw-magenta);
+    clip-path: polygon(0 62%, 100% 62%, 100% 78%, 0 78%);
+    transform: translate(2px, 0);
+  }
+  24%, 44% { text-shadow: none; clip-path: none; transform: none; }
+
+  45% {
+    text-shadow: -4px 0 var(--sw-pink), 4px 0 var(--sw-yellow);
+    clip-path: polygon(0 40%, 100% 40%, 100% 58%, 0 58%);
+    transform: translate(3px, 0) skewX(-0.5deg);
+  }
+  47% { text-shadow: none; clip-path: none; transform: none; }
+
+  70%, 100% { text-shadow: none; clip-path: none; transform: none; }
+
+  72% {
+    text-shadow: -2px 0 var(--sw-cyan), 2px 0 var(--sw-pink);
+    clip-path: polygon(0 5%, 100% 5%, 100% 18%, 0 18%);
+    transform: translate(-1px, 0);
+  }
+  74% {
+    text-shadow: 2px 0 var(--sw-magenta), -2px 0 var(--sw-cyan);
+    clip-path: polygon(0 82%, 100% 82%, 100% 95%, 0 95%);
+    transform: translate(1px, 0);
+  }
+  76% { text-shadow: none; clip-path: none; transform: none; }
+}
+
+/* ── Color cycle keyframe ────────────────────────────────────────────────── */
+@keyframes colorCycle {
+  0%   { color: var(--sw-white);   }
+  16%  { color: var(--sw-magenta); }
+  33%  { color: var(--sw-cyan);    }
+  50%  { color: var(--sw-pink);    }
+  66%  { color: var(--sw-yellow);  }
+  83%  { color: var(--sw-purple);  }
+  100% { color: var(--sw-white);   }
 }

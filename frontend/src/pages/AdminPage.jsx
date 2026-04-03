@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import useConfig from '../hooks/useConfig'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -24,7 +25,55 @@ function linkStatus(link) {
   return { label: 'Active', color: 'text-green-400' }
 }
 
-// ── sub-components ────────────────────────────────────────────────────────────
+const VIDEO_EXTS = new Set(['.webm', '.mp4', '.mov', '.avi'])
+function fileExt(name) {
+  const i = name.lastIndexOf('.')
+  return i >= 0 ? name.slice(i).toLowerCase() : ''
+}
+
+// ── BackgroundThumb ───────────────────────────────────────────────────────────
+
+function BackgroundThumb({ filename, selected, onSelect }) {
+  const src     = `/api/backgrounds/${encodeURIComponent(filename)}`
+  const isVideo = VIDEO_EXTS.has(fileExt(filename))
+  const vidRef  = useRef(null)
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      onMouseEnter={() => isVideo && vidRef.current?.play().catch(() => {})}
+      onMouseLeave={() => {
+        if (isVideo && vidRef.current) {
+          vidRef.current.pause()
+          vidRef.current.currentTime = 0
+        }
+      }}
+      className={`aspect-video rounded border-2 overflow-hidden relative
+        ${selected ? 'border-blue-500' : 'border-gray-600 hover:border-gray-400'}`}
+      title={filename}
+    >
+      {isVideo ? (
+        <video
+          ref={vidRef}
+          src={src}
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          className="w-full h-full object-cover"
+        />
+      ) : (
+        <img src={src} alt={filename} className="w-full h-full object-cover" />
+      )}
+      <span className="absolute bottom-0 left-0 right-0 text-[9px] text-white bg-black/60 px-1 truncate leading-4">
+        {filename}
+      </span>
+    </button>
+  )
+}
+
+// ── LoginForm ─────────────────────────────────────────────────────────────────
 
 function LoginForm({ onLogin }) {
   const [token, setToken] = useState('')
@@ -64,35 +113,42 @@ function LoginForm({ onLogin }) {
   )
 }
 
-function CreateLinkModal({ item, token, onCreated, onClose }) {
-  const [expiresAt, setExpiresAt] = useState('')
-  const [maxUses, setMaxUses]     = useState('')
-  const [maxClients, setMaxClients] = useState('')
-  const [notes, setNotes]         = useState('')
-  const [result, setResult]       = useState(null)
-  const [error, setError]         = useState('')
-  const [loading, setLoading]     = useState(false)
+// ── CreateLinkModal ───────────────────────────────────────────────────────────
+
+function CreateLinkModal({ item, token, availableBackgrounds, onCreated, onClose }) {
+  const [expiresAt, setExpiresAt]           = useState('')
+  const [maxUses, setMaxUses]               = useState('')
+  const [maxClients, setMaxClients]         = useState('')
+  const [notes, setNotes]                   = useState('')
+  const [flavorEnabled, setFlavorEnabled]   = useState(true)
+  const [background, setBackground]         = useState('')     // '' = random
+  const [customFlavorText, setCustomFlavor] = useState('')     // '' = pool
+  const [result, setResult]                 = useState(null)
+  const [error, setError]                   = useState('')
+  const [loading, setLoading]               = useState(false)
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
     setLoading(true)
     const body = {
-      item_id:     item.id,
-      expires_at:  expiresAt || null,
-      max_uses:    maxUses    ? parseInt(maxUses)    : null,
-      max_clients: maxClients ? parseInt(maxClients) : null,
-      notes:       notes || null,
+      item_id:        item.id,
+      expires_at:     expiresAt || null,
+      max_uses:       maxUses    ? parseInt(maxUses)    : null,
+      max_clients:    maxClients ? parseInt(maxClients) : null,
+      notes:          notes || null,
+      flavor_enabled: flavorEnabled,
+      background:     background || null,
+      flavor_text:    customFlavorText || null,
     }
     const r = await fetch('/api/admin/links', {
-      method: 'POST',
+      method:  'POST',
       headers: authHeaders(token),
-      body: JSON.stringify(body),
+      body:    JSON.stringify(body),
     })
     setLoading(false)
     if (r.ok) {
-      const data = await r.json()
-      setResult(data)
+      setResult(await r.json())
       onCreated()
     } else {
       const err = await r.json().catch(() => ({}))
@@ -100,34 +156,95 @@ function CreateLinkModal({ item, token, onCreated, onClose }) {
     }
   }
 
+  const inputCls = 'w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500'
+  const labelCls = 'block text-xs text-gray-400 mb-1'
+
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4" onClick={onClose}>
-      <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-md space-y-4" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4 overflow-y-auto py-4" onClick={onClose}>
+      <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-lg space-y-4 my-auto" onClick={e => e.stopPropagation()}>
         <h2 className="text-lg font-bold text-white">Create Share Link</h2>
-        <p className="text-gray-300 text-sm">{item.title} <span className="text-gray-500">({item.type}{item.year ? `, ${item.year}` : ''})</span></p>
+        <p className="text-gray-300 text-sm">
+          {item.title}
+          <span className="text-gray-500"> ({item.type}{item.year ? `, ${item.year}` : ''})</span>
+        </p>
 
         {!result ? (
           <form onSubmit={handleSubmit} className="space-y-3">
+
+            {/* Standard fields */}
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Expires at (leave blank for no expiry)</label>
-              <input type="datetime-local" value={expiresAt} onChange={e => setExpiresAt(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500" />
+              <label className={labelCls}>Expires at (leave blank for no expiry)</label>
+              <input type="datetime-local" value={expiresAt} onChange={e => setExpiresAt(e.target.value)} className={inputCls} />
             </div>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Max total views (leave blank for unlimited)</label>
-              <input type="number" min="1" value={maxUses} onChange={e => setMaxUses(e.target.value)} placeholder="e.g. 10"
-                className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500" />
+              <label className={labelCls}>Max total views (leave blank for unlimited)</label>
+              <input type="number" min="1" value={maxUses} onChange={e => setMaxUses(e.target.value)} placeholder="e.g. 10" className={inputCls} />
             </div>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Max unique viewers (leave blank for unlimited)</label>
-              <input type="number" min="1" value={maxClients} onChange={e => setMaxClients(e.target.value)} placeholder="e.g. 3"
-                className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500" />
+              <label className={labelCls}>Max unique viewers (leave blank for unlimited)</label>
+              <input type="number" min="1" value={maxClients} onChange={e => setMaxClients(e.target.value)} placeholder="e.g. 3" className={inputCls} />
             </div>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Notes (optional)</label>
-              <input type="text" value={notes} onChange={e => setNotes(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500" />
+              <label className={labelCls}>Notes (optional)</label>
+              <input type="text" value={notes} onChange={e => setNotes(e.target.value)} className={inputCls} />
             </div>
+
+            {/* Divider */}
+            <div className="border-t border-gray-700 pt-2">
+              <p className="text-xs text-gray-500 mb-2 uppercase tracking-wide">Visual flavor</p>
+
+              {/* Flavor enabled toggle */}
+              <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer mb-3">
+                <input
+                  type="checkbox"
+                  checked={flavorEnabled}
+                  onChange={e => setFlavorEnabled(e.target.checked)}
+                  className="rounded accent-purple-500"
+                />
+                Enable background, flavor text &amp; logo effects
+              </label>
+
+              {/* Background selector */}
+              {flavorEnabled && availableBackgrounds.length > 0 && (
+                <div className="mb-3">
+                  <label className={labelCls}>Background (leave unselected for random)</label>
+                  <div className="grid grid-cols-3 gap-2 max-h-44 overflow-y-auto rounded border border-gray-700 p-2 bg-gray-800">
+                    {/* "Random" tile */}
+                    <button
+                      type="button"
+                      onClick={() => setBackground('')}
+                      className={`aspect-video rounded border-2 flex items-center justify-center text-xs text-gray-400
+                        ${background === '' ? 'border-blue-500 bg-gray-700' : 'border-gray-600 hover:border-gray-400'}`}
+                    >
+                      Random
+                    </button>
+                    {availableBackgrounds.map(fname => (
+                      <BackgroundThumb
+                        key={fname}
+                        filename={fname}
+                        selected={background === fname}
+                        onSelect={() => setBackground(fname)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Custom flavor text */}
+              {flavorEnabled && (
+                <div>
+                  <label className={labelCls}>Custom flavor text (leave blank to use global pool)</label>
+                  <input
+                    type="text"
+                    value={customFlavorText}
+                    onChange={e => setCustomFlavor(e.target.value)}
+                    placeholder="e.g. this one is just for you"
+                    className={inputCls}
+                  />
+                </div>
+              )}
+            </div>
+
             {error && <p className="text-red-400 text-sm">{error}</p>}
             <div className="flex gap-2 pt-1">
               <button type="button" onClick={onClose} className="flex-1 bg-gray-700 hover:bg-gray-600 rounded py-2 text-white text-sm">Cancel</button>
@@ -155,13 +272,14 @@ function CreateLinkModal({ item, token, onCreated, onClose }) {
 // ── main admin page ───────────────────────────────────────────────────────────
 
 export default function AdminPage() {
-  const [token, setToken]       = useState(() => sessionStorage.getItem('admin_token') ?? '')
-  const [links, setLinks]       = useState([])
-  const [searchQuery, setQuery] = useState('')
-  const [results, setResults]   = useState([])
-  const [searching, setSearching] = useState(false)
+  const [token, setToken]           = useState(() => sessionStorage.getItem('admin_token') ?? '')
+  const [links, setLinks]           = useState([])
+  const [searchQuery, setQuery]     = useState('')
+  const [results, setResults]       = useState([])
+  const [searching, setSearching]   = useState(false)
   const [selectedItem, setSelected] = useState(null)
-  const searchTimer = useRef(null)
+  const searchTimer                 = useRef(null)
+  const { config }                  = useConfig()
 
   const isLoggedIn = !!token
 
@@ -269,6 +387,7 @@ export default function AdminPage() {
                   <th className="pb-2 pr-4">Expires</th>
                   <th className="pb-2 pr-4">Views</th>
                   <th className="pb-2 pr-4">Viewers</th>
+                  <th className="pb-2 pr-2">Flavor</th>
                   <th className="pb-2">Actions</th>
                 </tr>
               </thead>
@@ -286,6 +405,11 @@ export default function AdminPage() {
                       <td className="py-3 pr-4 text-gray-400">{formatDate(link.expires_at)}</td>
                       <td className="py-3 pr-4 text-gray-300">{usageLabel(link.use_count, link.max_uses)}</td>
                       <td className="py-3 pr-4 text-gray-300">{usageLabel(link.client_count, link.max_clients)}</td>
+                      <td className="py-3 pr-2">
+                        <span className={`text-xs ${link.flavor_enabled ? 'text-purple-400' : 'text-gray-600'}`}>
+                          {link.flavor_enabled ? 'On' : 'Off'}
+                        </span>
+                      </td>
                       <td className="py-3">
                         <div className="flex gap-2 flex-wrap">
                           <button
@@ -316,6 +440,7 @@ export default function AdminPage() {
         <CreateLinkModal
           item={selectedItem}
           token={token}
+          availableBackgrounds={config.available_backgrounds}
           onCreated={() => { loadLinks(); setQuery(''); setResults([]) }}
           onClose={() => setSelected(null)}
         />

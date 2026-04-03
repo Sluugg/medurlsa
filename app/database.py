@@ -61,6 +61,16 @@ async def init_db() -> None:
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     async with aiosqlite.connect(DB_PATH) as db:
         await db.executescript(SCHEMA)
+        # Safe migrations — ignored if columns already exist
+        for ddl in [
+            "ALTER TABLE share_links ADD COLUMN flavor_enabled INTEGER NOT NULL DEFAULT 1",
+            "ALTER TABLE share_links ADD COLUMN background TEXT",
+            "ALTER TABLE share_links ADD COLUMN flavor_text TEXT",
+        ]:
+            try:
+                await db.execute(ddl)
+            except Exception:
+                pass
         await db.commit()
 
 

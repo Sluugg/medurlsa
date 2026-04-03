@@ -4,10 +4,13 @@ from typing import Optional
 
 class CreateLinkRequest(BaseModel):
     item_id: str
-    expires_at: Optional[str] = None   # ISO 8601 datetime string, or null (no expiry)
-    max_uses: Optional[int] = None     # null = unlimited
-    max_clients: Optional[int] = None  # null = unlimited
+    expires_at: Optional[str] = None    # ISO 8601 datetime string, or null (no expiry)
+    max_uses: Optional[int] = None      # null = unlimited
+    max_clients: Optional[int] = None   # null = unlimited
     notes: Optional[str] = None
+    flavor_enabled: bool = True         # enable/disable all visual flavor features
+    background: Optional[str] = None   # specific background filename, null = random
+    flavor_text: Optional[str] = None  # specific flavor text, null = random from pool
 
 
 class RegisterRequest(BaseModel):

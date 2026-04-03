@@ -1,0 +1,36 @@
+{
+  "site_title": "dopelink",
+  "logo_path": "/path/to/your/logo.png",
+  "flavor_texts": [
+    "rewinding...",
+    "tracking...",
+    "signal lost",
+    "...please stand by",
+    "no signal",
+    "be kind, rewind",
+    "now playing"
+  ],
+  "timing": {
+    "glitch": {
+      "interval_min_s": 8,
+      "interval_max_s": 20,
+      "duration_ms": 400
+    },
+    "color_cycle": {
+      "interval_min_s": 15,
+      "interval_max_s": 40,
+      "duration_ms": 3000,
+      "rate_ms": 300
+    },
+    "flavor_text": {
+      "interval_min_s": 12,
+      "interval_max_s": 25,
+      "duration_ms": 4000
+    },
+    "logo_flash": {
+      "interval_min_s": 20,
+      "interval_max_s": 60,
+      "duration_ms": 3000
+    }
+  }
+}

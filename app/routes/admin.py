@@ -46,8 +46,9 @@ async def create_link(
 
     await db.execute(
         """INSERT INTO share_links
-               (uuid, item_id, item_type, item_title, expires_at, max_uses, max_clients, notes)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+               (uuid, item_id, item_type, item_title, expires_at, max_uses, max_clients,
+                notes, flavor_enabled, background, flavor_text)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             link_uuid,
             body.item_id,
@@ -57,18 +58,24 @@ async def create_link(
             body.max_uses,
             body.max_clients,
             body.notes,
+            1 if body.flavor_enabled else 0,
+            body.background,
+            body.flavor_text,
         ),
     )
     await db.commit()
 
     return {
-        "uuid":        link_uuid,
-        "url":         f"{PUBLIC_BASE_URL}/stream/{link_uuid}",
-        "item_title":  item["title"],
-        "item_type":   item["type"],
-        "expires_at":  body.expires_at,
-        "max_uses":    body.max_uses,
-        "max_clients": body.max_clients,
+        "uuid":           link_uuid,
+        "url":            f"{PUBLIC_BASE_URL}/stream/{link_uuid}",
+        "item_title":     item["title"],
+        "item_type":      item["type"],
+        "expires_at":     body.expires_at,
+        "max_uses":       body.max_uses,
+        "max_clients":    body.max_clients,
+        "flavor_enabled": body.flavor_enabled,
+        "background":     body.background,
+        "flavor_text":    body.flavor_text,
     }
 
 
