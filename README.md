@@ -17,6 +17,32 @@ A lightweight web app for generating public share links to media in a Jellyfin l
 - Node.js 18+
 - A Jellyfin server with a dedicated service account API key
 
+## System dependencies
+
+Install Python 3.11+ and Node.js 18+ before running `start.sh`.
+
+### Debian / Ubuntu
+
+```bash
+apt update && apt install -y python3 python3-pip nodejs npm
+```
+
+### Alpine Linux
+
+Build tools are needed to compile Python packages with C extensions (can be removed after):
+
+```bash
+apk add python3 py3-pip nodejs npm gcc musl-dev libffi-dev python3-dev
+```
+
+Once `start.sh` has finished installing Python packages, you can remove the build tools to keep the container trim:
+
+```bash
+apk del gcc musl-dev libffi-dev python3-dev
+```
+
+---
+
 ## Deployment
 
 ### 1. Clone and configure
