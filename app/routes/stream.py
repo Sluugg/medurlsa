@@ -125,12 +125,17 @@ async def get_cover_art(uuid: str, db: Connection = Depends(get_db)):
         raise HTTPException(status_code=410, detail="Link unavailable.")
 
     # ── 2. Fetch item data to get the Primary image tag ───────────────────────
-    # Jellyfin requires the image etag ('tag' param) to serve the image in most
-    # configurations — requesting without it returns 404 even when art exists.
+    # Jellyfin requires the image etag ('tag' param) to serve the image.
+    # For individual audio tracks the art lives on the parent album — the tag
+    # is in AlbumPrimaryImageTag and the image must be requested via AlbumId.
     async with httpx.AsyncClient() as client:
         item_r = await client.get(
             f"{JELLYFIN_URL}/Items",
-            params={"Ids": link["item_id"], "Fields": "ImageTags", "api_key": JELLYFIN_API_KEY},
+            params={
+                "Ids": link["item_id"],
+                "Fields": "ImageTags,AlbumId,AlbumPrimaryImageTag",
+                "api_key": JELLYFIN_API_KEY,
+            },
             timeout=10.0,
         )
         item_r.raise_for_status()
@@ -139,13 +144,23 @@ async def get_cover_art(uuid: str, db: Connection = Depends(get_db)):
         if not items:
             raise HTTPException(status_code=404, detail="No cover art available.")
 
-        primary_tag = items[0].get("ImageTags", {}).get("Primary")
+        item = items[0]
+
+        # Prefer a direct primary image on the item itself
+        primary_tag = item.get("ImageTags", {}).get("Primary")
+        image_item_id = link["item_id"]
+
+        # Fall back to album art for audio tracks
+        if not primary_tag:
+            primary_tag = item.get("AlbumPrimaryImageTag")
+            image_item_id = item.get("AlbumId", link["item_id"])
+
         if not primary_tag:
             raise HTTPException(status_code=404, detail="No cover art available.")
 
-        # ── 3. Fetch the image using the tag ──────────────────────────────────
+        # ── 3. Fetch the image using the resolved item ID and tag ─────────────
         image_r = await client.get(
-            f"{JELLYFIN_URL}/Items/{link['item_id']}/Images/Primary",
+            f"{JELLYFIN_URL}/Items/{image_item_id}/Images/Primary",
             params={"tag": primary_tag, "api_key": JELLYFIN_API_KEY},
             timeout=10.0,
         )
