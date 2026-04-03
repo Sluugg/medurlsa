@@ -4,6 +4,10 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+echo "==> Setting up Python virtual environment..."
+python3 -m venv .venv
+. .venv/bin/activate
+
 echo "==> Installing Python dependencies..."
 pip install -r requirements.txt
 
