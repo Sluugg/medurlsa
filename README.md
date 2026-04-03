@@ -5,7 +5,7 @@ A lightweight web app for generating public share links to media in a Jellyfin l
 ## What it does
 
 - Admin portal (`/admin`) lets you search your Jellyfin library and generate shareable links
-- Each link gets a unique UUID — the public URL looks like `https://yourdomain.com/watch/abc123`
+- Each link gets a unique UUID — the public URL looks like `https://yourdomain.com/stream/abc123`
 - The app proxies the media stream from Jellyfin server-side, so the API key is never exposed to viewers
 - Links can be configured with an expiration date, a max number of total views, and a max number of unique viewers
 - Viewers are tracked by a browser-generated ID (stored in localStorage) — no accounts or logins required for viewers
@@ -77,7 +77,7 @@ This installs dependencies, builds the frontend, and starts the server on `0.0.0
 ### 3. Access
 
 - Admin portal: `http://your-server/admin`
-- Share links: `http://your-server/watch/<uuid>` (generated from the admin portal)
+- Share links: `http://your-server/stream/<uuid>` (generated from the admin portal)
 
 ## Development mode
 

@@ -1,18 +1,24 @@
 """
-Streaming proxy endpoint.
+Streaming and image proxy endpoints.
 
 GET /api/stream/{uuid}?client_id={id}
   - Validates the link is still active and the client is registered.
   - Does NOT re-increment use_count (that happened at register time).
   - Forwards Range headers so the browser can seek without re-downloading.
   - Pipes Jellyfin's response bytes directly to the client — no disk buffering.
+
+GET /api/image/{uuid}
+  - Proxies the primary cover art image from Jellyfin for the linked item.
+  - Requires only a valid, non-expired link UUID — no client registration needed.
+  - Keeps the Jellyfin URL and API key server-side.
 """
 
 import datetime
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from aiosqlite import Connection
+from app.config import JELLYFIN_URL, JELLYFIN_API_KEY
 from app.database import get_db
 from app.jellyfin import build_stream_url
 
@@ -101,4 +107,36 @@ async def stream_media(
         status_code=jf_response.status_code,
         headers=response_headers,
         media_type=jf_response.headers.get("content-type", "application/octet-stream"),
+    )
+
+
+@router.get("/image/{uuid}")
+async def get_cover_art(uuid: str, db: Connection = Depends(get_db)):
+    # ── 1. Validate link exists and is active ─────────────────────────────────
+    async with db.execute("SELECT * FROM share_links WHERE uuid = ?", (uuid,)) as cur:
+        row = await cur.fetchone()
+
+    if row is None:
+        raise HTTPException(status_code=404, detail="Link not found.")
+
+    link = dict(row)
+
+    if not link["is_active"] or _is_expired(link["expires_at"]):
+        raise HTTPException(status_code=410, detail="Link unavailable.")
+
+    # ── 2. Fetch primary image from Jellyfin ──────────────────────────────────
+    image_url = (
+        f"{JELLYFIN_URL}/Items/{link['item_id']}/Images/Primary"
+        f"?api_key={JELLYFIN_API_KEY}"
+    )
+    async with httpx.AsyncClient() as client:
+        r = await client.get(image_url, timeout=10.0)
+
+    if r.status_code == 404:
+        raise HTTPException(status_code=404, detail="No cover art available.")
+    r.raise_for_status()
+
+    return Response(
+        content=r.content,
+        media_type=r.headers.get("content-type", "image/jpeg"),
     )

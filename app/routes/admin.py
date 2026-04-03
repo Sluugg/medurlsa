@@ -63,7 +63,7 @@ async def create_link(
 
     return {
         "uuid":        link_uuid,
-        "url":         f"{PUBLIC_BASE_URL}/watch/{link_uuid}",
+        "url":         f"{PUBLIC_BASE_URL}/stream/{link_uuid}",
         "item_title":  item["title"],
         "item_type":   item["type"],
         "expires_at":  body.expires_at,
@@ -90,7 +90,7 @@ async def list_links(
     links = []
     for row in rows:
         d = dict(row)
-        d["url"] = f"{PUBLIC_BASE_URL}/watch/{d['uuid']}"
+        d["url"] = f"{PUBLIC_BASE_URL}/stream/{d['uuid']}"
         links.append(d)
     return links
 

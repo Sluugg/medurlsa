@@ -33,7 +33,7 @@ export default function WatchPage() {
   const [clientId] = useState(getOrCreateClientId)
 
   useEffect(() => {
-    fetch(`/api/watch/${uuid}/register`, {
+    fetch(`/api/links/${uuid}/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ client_id: clientId }),
@@ -79,6 +79,18 @@ export default function WatchPage() {
       <div className="w-full space-y-4">
         {/* Title */}
         <h1 className="text-2xl font-bold text-white truncate">{media.item_title}</h1>
+
+        {/* Album art (audio only) */}
+        {!isVideo && (
+          <div className="flex justify-center">
+            <img
+              src={`/api/image/${uuid}`}
+              alt="Cover art"
+              className="w-64 h-64 object-cover rounded-lg shadow-xl"
+              onError={e => { e.target.style.display = 'none' }}
+            />
+          </div>
+        )}
 
         {/* Player */}
         <VideoPlayer streamUrl={streamUrl} isVideo={isVideo} />

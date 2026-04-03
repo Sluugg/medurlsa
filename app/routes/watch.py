@@ -1,8 +1,8 @@
 """
-Public watch endpoint.
+Public link registration endpoint.
 
-POST /api/watch/{uuid}/register
-  - Called by the watch page on load before rendering the player.
+POST /api/links/{uuid}/register
+  - Called by the stream page on load before rendering the player.
   - Validates the link and client, registers the client if new, increments use_count.
   - Returns item info on success or a status code indicating why access was denied.
 """
@@ -22,7 +22,7 @@ def _is_expired(expires_at: str | None) -> bool:
     return datetime.datetime.utcnow() > datetime.datetime.fromisoformat(expires_at)
 
 
-@router.post("/watch/{uuid}/register")
+@router.post("/links/{uuid}/register")
 async def register_watch(
     uuid: str,
     body: RegisterRequest,
