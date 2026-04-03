@@ -33,14 +33,23 @@ async def search_items(query: str, limit: int = 30) -> list[dict]:
 
 
 async def get_item(item_id: str) -> dict | None:
-    params = {"api_key": JELLYFIN_API_KEY}
+    # Use /Items?Ids= consistently with the rest of the API calls — /Items/{id}
+    # requires a UserId in some Jellyfin versions and returns 400 without it.
+    params = {
+        "Ids": item_id,
+        "Fields": "RunTimeTicks,ProductionYear",
+        "api_key": JELLYFIN_API_KEY,
+    }
     async with httpx.AsyncClient() as client:
-        r = await client.get(f"{JELLYFIN_URL}/Items/{item_id}", params=params, timeout=10.0)
+        r = await client.get(f"{JELLYFIN_URL}/Items", params=params, timeout=10.0)
         if r.status_code == 404:
             return None
         r.raise_for_status()
-        item = r.json()
+        items = r.json().get("Items", [])
 
+    if not items:
+        return None
+    item = items[0]
     ticks = item.get("RunTimeTicks")
     return {
         "id":               item["Id"],
