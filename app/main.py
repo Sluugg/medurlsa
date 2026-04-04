@@ -1,3 +1,4 @@
+import html
 import os
 import re
 from contextlib import asynccontextmanager
@@ -71,12 +72,12 @@ if os.path.isdir(FRONTEND_DIST):
             from app.config import PUBLIC_BASE_URL
 
             uuid       = full_path.split("/", 1)[1]
-            site_title = CONTENT_CONFIG.get("site_title", "dopelink")
-            og_image   = f"{PUBLIC_BASE_URL}/api/image/{uuid}"
-            og_url     = f"{PUBLIC_BASE_URL}/stream/{uuid}"
+            site_title = html.escape(CONTENT_CONFIG.get("site_title", "dopelink"))
+            og_image   = html.escape(f"{PUBLIC_BASE_URL}/api/image/{uuid}")
+            og_url     = html.escape(f"{PUBLIC_BASE_URL}/stream/{uuid}")
 
             with open(_INDEX_HTML, "r", encoding="utf-8") as f:
-                html = f.read()
+                raw_html = f.read()
 
             og = (
                 f'<meta property="og:type"        content="video.other" />\n'
@@ -88,7 +89,7 @@ if os.path.isdir(FRONTEND_DIST):
                 f'<meta name="twitter:title"      content="{site_title}" />\n'
                 f'<meta name="twitter:image"      content="{og_image}" />\n'
             )
-            html = html.replace("</head>", og + "</head>", 1)
-            return HTMLResponse(content=html)
+            raw_html = raw_html.replace("</head>", og + "</head>", 1)
+            return HTMLResponse(content=raw_html)
 
         return FileResponse(_INDEX_HTML)

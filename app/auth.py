@@ -3,6 +3,9 @@ Authentication / authorisation helpers.
 
 Current behaviour:
   - require_admin checks a static Bearer token from config.
+  - Failed attempts are rate-limited per IP: 5 failures within 15 minutes
+    locks that IP out for the remainder of that window. X-Forwarded-For is
+    respected so the real client IP is used behind a reverse proxy.
 
 Future (multi-user):
   - Replace the body of _verify_token with a DB lookup against the users table.
@@ -11,12 +14,54 @@ Future (multi-user):
   - The route signatures don't need to change — only this module.
 """
 
-from fastapi import HTTPException, Security, status
+import time
+from collections import defaultdict
+
+from fastapi import HTTPException, Request, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from app.config import ADMIN_TOKEN
 
 _bearer = HTTPBearer()
 
+# ── Rate limiting ─────────────────────────────────────────────────────────────
+# In-memory store: IP → list of failure timestamps.
+# Safe for single-worker deployments; resets on process restart.
+
+_MAX_FAILURES = 10    # max failures allowed within the window
+_WINDOW_S     = 500   # rolling window and lockout time
+
+_failures: dict[str, list[float]] = defaultdict(list)
+
+
+def _client_ip(request: Request) -> str:
+    """Return the real client IP, honouring X-Forwarded-For from a reverse proxy."""
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+def _check_rate_limit(ip: str) -> None:
+    now    = time.time()
+    cutoff = now - _WINDOW_S
+    _failures[ip] = [t for t in _failures[ip] if t > cutoff]
+    if len(_failures[ip]) >= _MAX_FAILURES:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many failed attempts. Try again later.",
+            headers={"Retry-After": str(_WINDOW_S)},
+        )
+
+
+def _record_failure(ip: str) -> None:
+    _failures[ip].append(time.time())
+
+
+def _clear_failures(ip: str) -> None:
+    _failures.pop(ip, None)
+
+
+# ── Token verification ────────────────────────────────────────────────────────
 
 def _verify_token(token: str) -> str:
     """
@@ -40,10 +85,20 @@ def _verify_token(token: str) -> str:
 
 
 def require_admin(
+    request:     Request,
     credentials: HTTPAuthorizationCredentials = Security(_bearer),
 ) -> str:
-    """Dependency: requires a valid admin bearer token."""
-    return _verify_token(credentials.credentials)
+    """Dependency: requires a valid admin bearer token. Rate-limits failures by IP."""
+    ip = _client_ip(request)
+    _check_rate_limit(ip)
+    try:
+        result = _verify_token(credentials.credentials)
+        _clear_failures(ip)
+        return result
+    except HTTPException as exc:
+        if exc.status_code == status.HTTP_401_UNAUTHORIZED:
+            _record_failure(ip)
+        raise
 
 
 def require_permission(permission: str):
@@ -54,6 +109,9 @@ def require_permission(permission: str):
     all permissions.  When the user table is live, swap the body for a real
     role/permission check.
     """
-    def _dep(credentials: HTTPAuthorizationCredentials = Security(_bearer)) -> str:
-        return _verify_token(credentials.credentials)
+    def _dep(
+        request:     Request,
+        credentials: HTTPAuthorizationCredentials = Security(_bearer),
+    ) -> str:
+        return require_admin(request, credentials)
     return _dep

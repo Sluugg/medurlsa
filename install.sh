@@ -7,6 +7,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 APP_DIR="$SCRIPT_DIR"
 SERVICE_NAME="webshare"
+SERVICE_USER="webshare"
 UVICORN="$APP_DIR/.venv/bin/uvicorn"
 LOG_DIR="/var/log/$SERVICE_NAME"
 
@@ -65,6 +66,23 @@ esac
 
 ok "System dependencies installed."
 
+# ── Create service user ───────────────────────────────────────────────────────
+info "Creating service user '$SERVICE_USER'..."
+
+case "$PLATFORM" in
+    alpine)
+        # -S: system account  -D: no password  -H: no home dir  -s: shell
+        adduser -S -D -H -s /sbin/nologin "$SERVICE_USER" 2>/dev/null \
+            && ok "User '$SERVICE_USER' created." \
+            || ok "User '$SERVICE_USER' already exists, skipping."
+        ;;
+    debian)
+        useradd --system --no-create-home --shell /usr/sbin/nologin "$SERVICE_USER" 2>/dev/null \
+            && ok "User '$SERVICE_USER' created." \
+            || ok "User '$SERVICE_USER' already exists, skipping."
+        ;;
+esac
+
 # ── Python venv + dependencies ────────────────────────────────────────────────
 info "Setting up Python virtual environment..."
 cd "$APP_DIR"
@@ -104,6 +122,28 @@ else
     ok ".env already exists, leaving it untouched."
 fi
 
+# ── File ownership and permissions ────────────────────────────────────────────
+info "Setting file ownership and permissions..."
+
+# App directory: owned by service user, not world-readable
+chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR"
+chmod 750 "$APP_DIR"
+
+# Secrets: readable only by the service user
+chmod 600 "$APP_DIR/.env"
+
+# Database directory: service user only
+chmod 700 "$APP_DIR/data"
+
+# Backgrounds: service user read/write (admin may drop files here)
+chmod 755 "$APP_DIR/backgrounds"
+
+# Log directory
+chown "$SERVICE_USER:$SERVICE_USER" "$LOG_DIR"
+chmod 750 "$LOG_DIR"
+
+ok "Permissions set."
+
 # ── Service installation ──────────────────────────────────────────────────────
 case "$PLATFORM" in
 
@@ -117,7 +157,7 @@ description="Web Share App"
 directory="$APP_DIR"
 command="$UVICORN"
 command_args="app.main:app --host 0.0.0.0 --port 80 --workers 1"
-command_user="root"
+command_user="$SERVICE_USER"
 pidfile="/run/\${RC_SVCNAME}.pid"
 command_background=true
 
@@ -127,10 +167,6 @@ error_log="$LOG_DIR/err.log"
 depend() {
     need net
     after firewall
-}
-
-start_pre() {
-    cd "$APP_DIR"
 }
 EOF
         chmod +x "/etc/init.d/$SERVICE_NAME"
@@ -148,6 +184,8 @@ After=network.target
 
 [Service]
 Type=simple
+User=$SERVICE_USER
+Group=$SERVICE_USER
 WorkingDirectory=$APP_DIR
 ExecStart=$UVICORN app.main:app --host 0.0.0.0 --port 80 --workers 1
 Restart=on-failure
@@ -168,6 +206,7 @@ esac
 echo ""
 ok "Installation complete."
 printf '    App directory:  %s\n' "$APP_DIR"
+printf '    Service user:   %s\n' "$SERVICE_USER"
 printf '    Logs:           %s\n' "$LOG_DIR"
 printf '    .env:           %s/.env\n' "$APP_DIR"
 echo ""
