@@ -64,6 +64,10 @@ if os.path.isdir(FRONTEND_DIST):
     if os.path.isdir(_assets):
         app.mount("/assets", StaticFiles(directory=_assets), name="assets")
 
+    _fonts = os.path.join(FRONTEND_DIST, "fonts")
+    if os.path.isdir(_fonts):
+        app.mount("/fonts", StaticFiles(directory=_fonts), name="fonts")
+
     @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_spa(full_path: str):
         # Inject OG meta tags for share link pages so social previews work
