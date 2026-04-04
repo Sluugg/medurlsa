@@ -69,19 +69,23 @@ ok "System dependencies installed."
 # ── Create service user ───────────────────────────────────────────────────────
 info "Creating service user '$SERVICE_USER'..."
 
-case "$PLATFORM" in
-    alpine)
-        # -S: system account  -D: no password  -H: no home dir  -s: shell
-        adduser -S -D -H -s /sbin/nologin "$SERVICE_USER" 2>/dev/null \
-            && ok "User '$SERVICE_USER' created." \
-            || ok "User '$SERVICE_USER' already exists, skipping."
-        ;;
-    debian)
-        useradd --system --no-create-home --shell /usr/sbin/nologin "$SERVICE_USER" 2>/dev/null \
-            && ok "User '$SERVICE_USER' created." \
-            || ok "User '$SERVICE_USER' already exists, skipping."
-        ;;
-esac
+if id "$SERVICE_USER" >/dev/null 2>&1; then
+    ok "User '$SERVICE_USER' already exists, skipping."
+else
+    case "$PLATFORM" in
+        alpine)
+            # -S: system account  -H: no home dir  -s: shell
+            adduser -S -H -s /sbin/nologin "$SERVICE_USER"
+            ;;
+        debian)
+            useradd --system --no-create-home --shell /usr/sbin/nologin "$SERVICE_USER"
+            ;;
+    esac
+
+    # Verify the user was actually created before continuing
+    id "$SERVICE_USER" >/dev/null 2>&1 || die "Failed to create user '$SERVICE_USER'. Check adduser/useradd output above."
+    ok "User '$SERVICE_USER' created."
+fi
 
 # ── Python venv + dependencies ────────────────────────────────────────────────
 info "Setting up Python virtual environment..."
