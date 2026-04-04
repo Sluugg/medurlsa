@@ -74,8 +74,9 @@ if id "$SERVICE_USER" >/dev/null 2>&1; then
 else
     case "$PLATFORM" in
         alpine)
-            # -S: system account  -H: no home dir  -s: shell
-            adduser -S -H -s /sbin/nologin "$SERVICE_USER"
+            # Create group first — adduser -S does not create a matching group automatically
+            addgroup -S "$SERVICE_USER"
+            adduser -S -H -G "$SERVICE_USER" -s /sbin/nologin "$SERVICE_USER"
             ;;
         debian)
             useradd --system --no-create-home --shell /usr/sbin/nologin "$SERVICE_USER"
