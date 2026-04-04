@@ -109,7 +109,7 @@ ok "User '$SERVICE_USER' ready."
 # ── Python venv + dependencies ────────────────────────────────────────────────
 info "Setting up Python virtual environment..."
 cd "$APP_DIR"
-python3 -m venv .venv
+python3 -m venv --clear .venv
 .venv/bin/pip install --quiet --upgrade pip
 .venv/bin/pip install --quiet -r requirements.txt
 ok "Python dependencies installed."
@@ -162,7 +162,7 @@ chmod 700 "$APP_DIR/data"
 chmod 755 "$APP_DIR/backgrounds"
 
 # Log directory
-chown "$SERVICE_USER:$SERVICE_USER" "$LOG_DIR"
+chown -R "$SERVICE_USER:$SERVICE_USER" "$LOG_DIR"
 chmod 750 "$LOG_DIR"
 
 ok "Permissions set."
