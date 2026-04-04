@@ -100,12 +100,12 @@ rc-update add nftables boot
 
 *OpenRC* (`/etc/init.d/webshare`):
 ```sh
-command_args="app.main:app --host 127.0.0.1 --port 80 --workers 1"
+command_args="app.main:app --host 127.0.0.1 --port 8000 --workers 1"
 ```
 
 *systemd* (`/etc/systemd/system/webshare.service`):
 ```ini
-ExecStart=/path/to/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 80 --workers 1
+ExecStart=/path/to/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
 ```
 
 ### Admin path rate limiting at the reverse proxy
