@@ -69,24 +69,42 @@ ok "System dependencies installed."
 # ── Create service user ───────────────────────────────────────────────────────
 info "Creating service user '$SERVICE_USER'..."
 
-if id "$SERVICE_USER" >/dev/null 2>&1; then
-    ok "User '$SERVICE_USER' already exists, skipping."
-else
-    case "$PLATFORM" in
-        alpine)
-            # Create group first — adduser -S does not create a matching group automatically
-            addgroup -S "$SERVICE_USER"
-            adduser -S -H -G "$SERVICE_USER" -s /sbin/nologin "$SERVICE_USER"
-            ;;
-        debian)
-            useradd --system --no-create-home --shell /usr/sbin/nologin "$SERVICE_USER"
-            ;;
-    esac
+case "$PLATFORM" in
+    alpine)
+        # Ensure the group exists — adduser -S does not create a matching group automatically
+        grep -q "^${SERVICE_USER}:" /etc/group 2>/dev/null \
+            || addgroup -S "$SERVICE_USER" \
+            || die "Failed to create group '$SERVICE_USER'."
 
-    # Verify the user was actually created before continuing
-    id "$SERVICE_USER" >/dev/null 2>&1 || die "Failed to create user '$SERVICE_USER'. Check adduser/useradd output above."
-    ok "User '$SERVICE_USER' created."
-fi
+        if id "$SERVICE_USER" >/dev/null 2>&1; then
+            # User exists — check primary group is the service group
+            EXPECTED_GID=$(grep "^${SERVICE_USER}:" /etc/group | cut -d: -f3)
+            ACTUAL_GID=$(id -g "$SERVICE_USER")
+            if [ "$ACTUAL_GID" != "$EXPECTED_GID" ]; then
+                warn "User '$SERVICE_USER' has wrong primary group — recreating..."
+                deluser "$SERVICE_USER" || die "Failed to remove existing '$SERVICE_USER' user."
+                adduser -S -H -G "$SERVICE_USER" -s /sbin/nologin "$SERVICE_USER" \
+                    || die "Failed to recreate user '$SERVICE_USER'."
+            else
+                ok "User '$SERVICE_USER' already exists with correct group, skipping."
+            fi
+        else
+            adduser -S -H -G "$SERVICE_USER" -s /sbin/nologin "$SERVICE_USER" \
+                || die "Failed to create user '$SERVICE_USER'."
+        fi
+        ;;
+    debian)
+        if id "$SERVICE_USER" >/dev/null 2>&1; then
+            ok "User '$SERVICE_USER' already exists, skipping."
+        else
+            useradd --system --no-create-home --shell /usr/sbin/nologin "$SERVICE_USER" \
+                || die "Failed to create user '$SERVICE_USER'."
+        fi
+        ;;
+esac
+
+id "$SERVICE_USER" >/dev/null 2>&1 || die "User '$SERVICE_USER' not found after creation. Check output above."
+ok "User '$SERVICE_USER' ready."
 
 # ── Python venv + dependencies ────────────────────────────────────────────────
 info "Setting up Python virtual environment..."
