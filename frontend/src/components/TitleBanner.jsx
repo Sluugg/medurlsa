@@ -22,6 +22,7 @@ export default function TitleBanner({ siteTitle, timing, fonts }) {
 
   const gt = timing?.glitch      ?? {}
   const ct = timing?.color_cycle ?? {}
+  const jt = timing?.jitter      ?? {}
   const tf = fonts?.title        ?? {}
 
   // ── Glitch loop ─────────────────────────────────────────────────────────────
@@ -67,6 +68,8 @@ export default function TitleBanner({ siteTitle, timing, fonts }) {
 
   const glitchDuration = gt.duration_ms ?? 400
   const cycleDuration  = ct.duration_ms ?? 3000
+  const jitterDelayMs  = jt.delay_ms    ?? 300
+  const jitterDistPx   = jt.distance_px ?? 4
 
   // Build animation string: glitch and cycle are independent — both can be active.
   const animations = [
@@ -85,16 +88,29 @@ export default function TitleBanner({ siteTitle, timing, fonts }) {
       >
         <div
           style={{
-            fontFamily:    tf.family ?? "'VCROSDMono', 'Courier New', monospace",
-            fontSize:      tf.size   ?? '1.25rem',
-            fontWeight:    tf.weight ?? 'bold',
-            letterSpacing: '0.15em',
-            userSelect:    'none',
-            color:         isCycling ? undefined : '#ffffff',
-            animation:     animations,
+            fontFamily:         tf.family ?? "'VCROSDMono', 'Courier New', monospace",
+            fontSize:           tf.size   ?? '1.25rem',
+            fontWeight:         tf.weight ?? 'bold',
+            letterSpacing:      '0.15em',
+            userSelect:         'none',
+            color:              isCycling ? undefined : '#ffffff',
+            animation:          animations,
+            '--jitter-distance': `${jitterDistPx}px`,
           }}
         >
-          {siteTitle ?? 'dopelink'}
+          {[...(siteTitle ?? 'dopelink')].map((char, i) => (
+            <span
+              key={i}
+              style={{
+                display:   'inline-block',
+                animation: char === ' '
+                  ? undefined
+                  : `${i % 2 === 0 ? 'jitterUp' : 'jitterDown'} ${jitterDelayMs}ms steps(1) infinite alternate`,
+              }}
+            >
+              {char === ' ' ? '\u00A0' : char}
+            </span>
+          ))}
         </div>
       </div>
     </div>

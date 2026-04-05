@@ -26,6 +26,10 @@ _DEFAULTS: dict = {
         },
     },
     "timing": {
+        "jitter": {
+            "delay_ms":    300,
+            "distance_px": 4,
+        },
         "glitch": {
             "interval_min_s": 8,
             "interval_max_s": 20,

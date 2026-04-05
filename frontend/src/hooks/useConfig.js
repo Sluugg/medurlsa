@@ -10,6 +10,7 @@ const DEFAULT_CONFIG = {
   flavor_texts:          [],
   available_backgrounds: [],
   timing: {
+    jitter:      { delay_ms: 300, distance_px: 4 },
     glitch:      { interval_min_s: 8,  interval_max_s: 20, duration_ms: 400 },
     color_cycle: { interval_min_s: 15, interval_max_s: 40, duration_ms: 3000, rate_ms: 300 },
     flavor_text: { interval_min_s: 12, interval_max_s: 25, duration_ms: 4000 },
