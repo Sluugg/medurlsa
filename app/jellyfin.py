@@ -11,7 +11,7 @@ async def search_items(query: str, limit: int = 30) -> list[dict]:
         "Recursive": "true",
         "IncludeItemTypes": STREAMABLE_TYPES,
         "Limit": limit,
-        "Fields": "RunTimeTicks,ProductionYear,Overview",
+        "Fields": "RunTimeTicks,ProductionYear,Overview,Artists",
         "api_key": JELLYFIN_API_KEY,
     }
     async with httpx.AsyncClient() as client:
@@ -21,13 +21,15 @@ async def search_items(query: str, limit: int = 30) -> list[dict]:
 
     results = []
     for item in items:
-        ticks = item.get("RunTimeTicks")
+        ticks   = item.get("RunTimeTicks")
+        artists = item.get("Artists", [])
         results.append({
             "id":               item["Id"],
             "title":            item.get("Name", "Unknown"),
             "type":             item.get("Type", "Unknown"),
             "year":             item.get("ProductionYear"),
             "duration_seconds": int(ticks / 10_000_000) if ticks else None,
+            "artist":           ", ".join(artists) if artists else None,
         })
     return results
 
@@ -37,7 +39,7 @@ async def get_item(item_id: str) -> dict | None:
     # requires a UserId in some Jellyfin versions and returns 400 without it.
     params = {
         "Ids": item_id,
-        "Fields": "RunTimeTicks,ProductionYear",
+        "Fields": "RunTimeTicks,ProductionYear,Artists",
         "api_key": JELLYFIN_API_KEY,
     }
     async with httpx.AsyncClient() as client:
@@ -49,14 +51,16 @@ async def get_item(item_id: str) -> dict | None:
 
     if not items:
         return None
-    item = items[0]
-    ticks = item.get("RunTimeTicks")
+    item    = items[0]
+    ticks   = item.get("RunTimeTicks")
+    artists = item.get("Artists", [])
     return {
         "id":               item["Id"],
         "title":            item.get("Name", "Unknown"),
         "type":             item.get("Type", "Unknown"),
         "year":             item.get("ProductionYear"),
         "duration_seconds": int(ticks / 10_000_000) if ticks else None,
+        "artist":           ", ".join(artists) if artists else None,
     }
 
 

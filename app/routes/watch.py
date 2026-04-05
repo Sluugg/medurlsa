@@ -94,6 +94,7 @@ async def register_watch(
     return {
         "status":         "ok",
         "item_title":     link["item_title"],
+        "item_artist":    link["item_artist"],
         "item_type":      link["item_type"],
         "expires_at":     link["expires_at"],
         "flavor_enabled": bool(link["flavor_enabled"]),

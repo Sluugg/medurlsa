@@ -46,14 +46,15 @@ async def create_link(
 
     await db.execute(
         """INSERT INTO share_links
-               (uuid, item_id, item_type, item_title, expires_at, max_uses, max_clients,
+               (uuid, item_id, item_type, item_title, item_artist, expires_at, max_uses, max_clients,
                 notes, flavor_enabled, background, flavor_text)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             link_uuid,
             body.item_id,
             item["type"],
             item["title"],
+            item.get("artist"),
             body.expires_at,
             body.max_uses,
             body.max_clients,
@@ -69,6 +70,7 @@ async def create_link(
         "uuid":           link_uuid,
         "url":            f"{PUBLIC_BASE_URL}/stream/{link_uuid}",
         "item_title":     item["title"],
+        "item_artist":    item.get("artist"),
         "item_type":      item["type"],
         "expires_at":     body.expires_at,
         "max_uses":       body.max_uses,

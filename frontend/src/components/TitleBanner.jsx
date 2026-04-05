@@ -79,7 +79,7 @@ export default function TitleBanner({ siteTitle, timing, fonts }) {
       <div
         className="inline-block rounded px-4 py-2"
         style={{
-          border:          '1px solid rgba(191, 95, 255, 0.5)',
+          border:          '3px solid rgba(191, 95, 255, 0.5)',
           backgroundColor: 'rgba(0, 0, 0, 0.7)',
         }}
       >

@@ -118,7 +118,12 @@ export default function WatchPage() {
           <TitleBanner siteTitle={config.site_title} timing={config.timing} fonts={config.fonts} />
 
           {/* Media title */}
-          <h1 className="text-2xl font-bold text-white truncate">{media.item_title}</h1>
+          <div className="space-y-0.5">
+            <h1 className="text-2xl font-bold text-white truncate">{media.item_title}</h1>
+            {media.item_artist && (
+              <p className="text-sm text-gray-400 truncate">{media.item_artist}</p>
+            )}
+          </div>
 
           {/* Album art — audio only */}
           {!isVideo && (

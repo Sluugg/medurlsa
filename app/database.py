@@ -66,6 +66,7 @@ async def init_db() -> None:
             "ALTER TABLE share_links ADD COLUMN flavor_enabled INTEGER NOT NULL DEFAULT 1",
             "ALTER TABLE share_links ADD COLUMN background TEXT",
             "ALTER TABLE share_links ADD COLUMN flavor_text TEXT",
+            "ALTER TABLE share_links ADD COLUMN item_artist TEXT",
         ]:
             try:
                 await db.execute(ddl)

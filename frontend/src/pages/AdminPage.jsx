@@ -351,6 +351,9 @@ export default function AdminPage() {
               <li key={item.id} className="flex items-center justify-between px-4 py-3 bg-gray-800 hover:bg-gray-750">
                 <div>
                   <span className="text-white text-sm font-medium">{item.title}</span>
+                  {item.artist && (
+                    <span className="ml-2 text-xs text-gray-400">{item.artist}</span>
+                  )}
                   <span className="ml-2 text-xs text-gray-500">
                     {item.type}{item.year ? ` · ${item.year}` : ''}
                     {item.duration_seconds ? ` · ${Math.round(item.duration_seconds / 60)} min` : ''}
@@ -398,6 +401,9 @@ export default function AdminPage() {
                     <tr key={link.uuid} className="align-middle">
                       <td className="py-3 pr-4">
                         <div className="font-medium text-white">{link.item_title}</div>
+                        {link.item_artist && (
+                          <div className="text-xs text-gray-400">{link.item_artist}</div>
+                        )}
                         <div className="text-xs text-gray-500">{link.item_type}</div>
                         {link.notes && <div className="text-xs text-gray-600 italic">{link.notes}</div>}
                       </td>
