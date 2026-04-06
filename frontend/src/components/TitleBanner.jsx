@@ -95,8 +95,9 @@ export default function TitleBanner({ siteTitle, timing, fonts }) {
       <div
         className="pearl-border inline-block rounded px-4 py-2"
         style={{
-          animationDuration:     `${pearlCycleRate}s`,
+          backgroundColor:       'rgba(5, 2, 18, 0.85)',
           '--pearl-border-width': `${pearlBorderWidth}px`,
+          '--pearl-cycle-rate':   `${pearlCycleRate}s`,
         }}
       >
         <div

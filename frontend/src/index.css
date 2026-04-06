@@ -40,29 +40,41 @@ body {
   to { --pearl-angle: 360deg; }
 }
 
-/* Single-element gradient border — no wrapper div needed.
-   Layer 1 clipped to padding-box: semi-transparent dark fill covers content only.
-   Layer 2 clipped to border-box:  pearl gradient fills the transparent border strip.
-   The gradient never sits behind the content, so no conic spokes bleed through.
-   --pearl-border-width is set via inline style from config. */
+/* Pseudo-element gradient border.
+   ::before holds the rotating gradient and is masked to the border strip only —
+   the content area is cut out so the gradient never sits behind the text.
+   The parent keeps its own semi-transparent background independently.
+   --pearl-border-width and --pearl-cycle-rate are set via inline style from config. */
 .pearl-border {
-  border: var(--pearl-border-width, 2px) solid transparent;
-  background-image:
-    linear-gradient(rgba(5, 2, 18, 0.85), rgba(5, 2, 18, 0.85)),
-    conic-gradient(
-      from var(--pearl-angle),
-      #ffffff,
-      #ffc8ee,
-      #ffffff,
-      #c8f0ff,
-      #ffffff,
-      #e0c8ff,
-      #ffffff,
-      #ffc8ee
-    );
-  background-origin: border-box, border-box;
-  background-clip:   padding-box, border-box;
-  animation: pearlRotate 8s linear infinite;
+  position: relative;
+}
+
+.pearl-border::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: var(--pearl-border-width, 2px);
+  background: conic-gradient(
+    from var(--pearl-angle),
+    #ffffff,
+    #ffc8ee,
+    #ffffff,
+    #c8f0ff,
+    #ffffff,
+    #e0c8ff,
+    #ffffff,
+    #ffc8ee
+  );
+  /* XOR mask: visible only where the full-element layer covers but the
+     content-box layer does not — i.e. only the border strip. */
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+  animation: pearlRotate var(--pearl-cycle-rate, 8s) linear infinite;
 }
 
 /* ── VHS Glitch keyframe ─────────────────────────────────────────────────── */
