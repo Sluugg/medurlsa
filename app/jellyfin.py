@@ -97,9 +97,21 @@ async def get_item(item_id: str) -> dict | None:
 
 
 def build_stream_url(item_id: str, item_type: str) -> str:
-    """Construct the internal Jellyfin stream URL for proxying."""
+    """Construct the internal Jellyfin stream URL for proxying.
+
+    Audio: request AAC-in-MP4 transcoding so codecs like ALAC that browsers
+    cannot decode natively are converted transparently by Jellyfin.  Omitting
+    `static=true` is what enables transcoding; the explicit AudioCodec and
+    Container parameters guarantee a browser-safe output format.
+
+    Video: keep static passthrough — transcoding video on-the-fly is expensive
+    and most video containers served by Jellyfin are already browser-compatible.
+    """
     if item_type == "Audio":
         path = f"/Audio/{item_id}/stream"
-    else:
-        path = f"/Videos/{item_id}/stream"
+        return (
+            f"{JELLYFIN_URL}{path}"
+            f"?AudioCodec=aac&Container=mp4&api_key={JELLYFIN_API_KEY}"
+        )
+    path = f"/Videos/{item_id}/stream"
     return f"{JELLYFIN_URL}{path}?static=true&api_key={JELLYFIN_API_KEY}"
