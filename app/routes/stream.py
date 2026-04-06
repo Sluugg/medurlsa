@@ -14,15 +14,27 @@ GET /api/image/{uuid}
 """
 
 import datetime
+import mimetypes
+import os
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from aiosqlite import Connection
 from app.config import JELLYFIN_URL, JELLYFIN_API_KEY
+from app.content_config import CONTENT_CONFIG
 from app.database import get_db
 from app.jellyfin import build_stream_url
 
 router = APIRouter()
+
+
+def _logo_fallback():
+    """Return the configured logo as a cover art substitute, or raise 404."""
+    logo_path = CONTENT_CONFIG.get("logo_path")
+    if logo_path and os.path.isfile(str(logo_path)):
+        mime, _ = mimetypes.guess_type(str(logo_path))
+        return FileResponse(str(logo_path), media_type=mime or "image/png")
+    raise HTTPException(status_code=404, detail="No cover art available.")
 
 _PASSTHROUGH_HEADERS = (
     "content-type",
@@ -142,7 +154,7 @@ async def get_cover_art(uuid: str, db: Connection = Depends(get_db)):
         items = item_r.json().get("Items", [])
 
         if not items:
-            raise HTTPException(status_code=404, detail="No cover art available.")
+            return _logo_fallback()
 
         item = items[0]
 
@@ -156,7 +168,7 @@ async def get_cover_art(uuid: str, db: Connection = Depends(get_db)):
             image_item_id = item.get("AlbumId", link["item_id"])
 
         if not primary_tag:
-            raise HTTPException(status_code=404, detail="No cover art available.")
+            return _logo_fallback()
 
         # ── 3. Fetch the image using the resolved item ID and tag ─────────────
         image_r = await client.get(
@@ -166,7 +178,7 @@ async def get_cover_art(uuid: str, db: Connection = Depends(get_db)):
         )
 
     if image_r.status_code == 404:
-        raise HTTPException(status_code=404, detail="No cover art available.")
+        return _logo_fallback()
     image_r.raise_for_status()
 
     return Response(
