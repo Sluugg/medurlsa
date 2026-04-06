@@ -40,19 +40,28 @@ body {
   to { --pearl-angle: 360deg; }
 }
 
-/* Wrapper div — gradient fills this, inner div sits on top leaving a 2px rim */
+/* Single-element gradient border — no wrapper div needed.
+   Layer 1 clipped to padding-box: semi-transparent dark fill covers content only.
+   Layer 2 clipped to border-box:  pearl gradient fills the transparent border strip.
+   The gradient never sits behind the content, so no conic spokes bleed through.
+   --pearl-border-width is set via inline style from config. */
 .pearl-border {
-  background: conic-gradient(
-    from var(--pearl-angle),
-    #ffffff,
-    #ffc8ee,
-    #ffffff,
-    #c8f0ff,
-    #ffffff,
-    #e0c8ff,
-    #ffffff,
-    #ffc8ee
-  );
+  border: var(--pearl-border-width, 2px) solid transparent;
+  background-image:
+    linear-gradient(rgba(5, 2, 18, 0.85), rgba(5, 2, 18, 0.85)),
+    conic-gradient(
+      from var(--pearl-angle),
+      #ffffff,
+      #ffc8ee,
+      #ffffff,
+      #c8f0ff,
+      #ffffff,
+      #e0c8ff,
+      #ffffff,
+      #ffc8ee
+    );
+  background-origin: border-box, border-box;
+  background-clip:   padding-box, border-box;
   animation: pearlRotate 8s linear infinite;
 }
 

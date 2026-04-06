@@ -10,7 +10,7 @@ const DEFAULT_CONFIG = {
   flavor_texts:          [],
   available_backgrounds: [],
   timing: {
-    pearl_border: { cycle_rate_s: 8 },
+    pearl_border: { cycle_rate_s: 8, border_width_px: 2 },
     jitter:       { delay_ms: 300, distance_px: 4 },
     glitch:      { interval_min_s: 8,  interval_max_s: 20, duration_ms: 400 },
     color_cycle: { interval_min_s: 15, interval_max_s: 40, duration_ms: 3000, rate_ms: 300 },

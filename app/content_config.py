@@ -27,7 +27,8 @@ _DEFAULTS: dict = {
     },
     "timing": {
         "pearl_border": {
-            "cycle_rate_s": 8,
+            "cycle_rate_s":    8,
+            "border_width_px": 2,
         },
         "jitter": {
             "delay_ms":    300,
