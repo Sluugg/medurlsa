@@ -17,8 +17,9 @@ function rand(min, max) {
 }
 
 export default function TitleBanner({ siteTitle, timing, fonts }) {
-  const [glitching, setGlitching] = useState(false)
-  const [isCycling, setIsCycling] = useState(false)
+  const [glitching,   setGlitching]   = useState(false)
+  const [isCycling,   setIsCycling]   = useState(false)
+  const [jitterPhase, setJitterPhase] = useState(0)
 
   const gt = timing?.glitch      ?? {}
   const ct = timing?.color_cycle ?? {}
@@ -71,6 +72,15 @@ export default function TitleBanner({ siteTitle, timing, fonts }) {
   const jitterDelayMs  = jt.delay_ms    ?? 300
   const jitterDistPx   = jt.distance_px ?? 4
 
+  // ── Jitter loop ──────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const iid = setInterval(
+      () => setJitterPhase(p => 1 - p),
+      jitterDelayMs,
+    )
+    return () => clearInterval(iid)
+  }, [jitterDelayMs])
+
   // Build animation string: glitch and cycle are independent — both can be active.
   const animations = [
     glitching ? `vhsGlitch ${glitchDuration}ms steps(1) forwards` : null,
@@ -88,14 +98,13 @@ export default function TitleBanner({ siteTitle, timing, fonts }) {
       >
         <div
           style={{
-            fontFamily:         tf.family ?? "'VCROSDMono', 'Courier New', monospace",
-            fontSize:           tf.size   ?? '1.25rem',
-            fontWeight:         tf.weight ?? 'bold',
-            letterSpacing:      '0.15em',
-            userSelect:         'none',
-            color:              isCycling ? undefined : '#ffffff',
-            animation:          animations,
-            '--jitter-distance': `${jitterDistPx}px`,
+            fontFamily:    tf.family ?? "'VCROSDMono', 'Courier New', monospace",
+            fontSize:      tf.size   ?? '1.25rem',
+            fontWeight:    tf.weight ?? 'bold',
+            letterSpacing: '0.15em',
+            userSelect:    'none',
+            color:         isCycling ? undefined : '#ffffff',
+            animation:     animations,
           }}
         >
           {[...(siteTitle ?? 'dopelink')].map((char, i) => (
@@ -103,9 +112,9 @@ export default function TitleBanner({ siteTitle, timing, fonts }) {
               key={i}
               style={{
                 display:   'inline-block',
-                animation: char === ' '
+                transform: char === ' '
                   ? undefined
-                  : `${i % 2 === 0 ? 'jitterUp' : 'jitterDown'} ${jitterDelayMs}ms steps(1) infinite alternate`,
+                  : `translateY(${jitterPhase * jitterDistPx * (i % 2 === 0 ? -1 : 1)}px)`,
               }}
             >
               {char === ' ' ? '\u00A0' : char}

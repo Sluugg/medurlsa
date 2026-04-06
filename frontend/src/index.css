@@ -68,18 +68,6 @@ body {
   76% { text-shadow: none; clip-path: none; transform: none; }
 }
 
-/* ── Letter jitter keyframes ─────────────────────────────────────────────── */
-/* Distance is driven by --jitter-distance CSS custom property set inline.    */
-/* steps(1) alternate on each span produces an instant 2-position snap.       */
-@keyframes jitterUp {
-  from { transform: translateY(0); }
-  to   { transform: translateY(calc(-1 * var(--jitter-distance, 4px))); }
-}
-@keyframes jitterDown {
-  from { transform: translateY(0); }
-  to   { transform: translateY(var(--jitter-distance, 4px)); }
-}
-
 /* ── Color cycle keyframe ────────────────────────────────────────────────── */
 @keyframes colorCycle {
   0%   { color: var(--sw-white);   }
