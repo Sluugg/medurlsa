@@ -21,10 +21,11 @@ export default function TitleBanner({ siteTitle, timing, fonts }) {
   const [isCycling,   setIsCycling]   = useState(false)
   const [jitterPhase, setJitterPhase] = useState(0)
 
-  const gt = timing?.glitch      ?? {}
-  const ct = timing?.color_cycle ?? {}
-  const jt = timing?.jitter      ?? {}
-  const tf = fonts?.title        ?? {}
+  const gt = timing?.glitch        ?? {}
+  const ct = timing?.color_cycle  ?? {}
+  const jt = timing?.jitter       ?? {}
+  const pb = timing?.pearl_border ?? {}
+  const tf = fonts?.title         ?? {}
 
   // ── Glitch loop ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -67,10 +68,11 @@ export default function TitleBanner({ siteTitle, timing, fonts }) {
     return () => clearTimeout(tid)
   }, [ct.interval_min_s, ct.interval_max_s, ct.duration_ms])
 
-  const glitchDuration = gt.duration_ms ?? 400
-  const cycleDuration  = ct.duration_ms ?? 3000
-  const jitterDelayMs  = jt.delay_ms    ?? 300
-  const jitterDistPx   = jt.distance_px ?? 4
+  const glitchDuration  = gt.duration_ms  ?? 400
+  const cycleDuration   = ct.duration_ms  ?? 3000
+  const jitterDelayMs   = jt.delay_ms     ?? 300
+  const jitterDistPx    = jt.distance_px  ?? 4
+  const pearlCycleRate  = pb.cycle_rate_s ?? 8
 
   // ── Jitter loop ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -89,12 +91,15 @@ export default function TitleBanner({ siteTitle, timing, fonts }) {
 
   return (
     <div className="w-full flex justify-center">
+      {/* Gradient wrapper — 2px padding becomes the visible pearl border */}
       <div
-        className="inline-block rounded px-4 py-2"
-        style={{
-          border:          '3px solid rgba(191, 95, 255, 0.5)',
-          backgroundColor: 'rgba(0, 0, 0, 0.7)',
-        }}
+        className="pearl-border inline-block rounded"
+        style={{ padding: '2px', animationDuration: `${pearlCycleRate}s` }}
+      >
+      {/* Inner content box sits on top of the gradient, leaving the rim visible */}
+      <div
+        className="rounded px-4 py-2"
+        style={{ backgroundColor: 'rgba(5, 2, 18, 0.85)' }}
       >
         <div
           style={{
@@ -121,6 +126,7 @@ export default function TitleBanner({ siteTitle, timing, fonts }) {
             </span>
           ))}
         </div>
+      </div>
       </div>
     </div>
   )

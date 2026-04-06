@@ -28,6 +28,34 @@ body {
   @apply bg-gray-950 text-gray-100 min-h-screen;
 }
 
+/* ── Pearlescent border ──────────────────────────────────────────────────── */
+/* @property makes --pearl-angle animatable so conic-gradient rotates smoothly */
+@property --pearl-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes pearlRotate {
+  to { --pearl-angle: 360deg; }
+}
+
+/* Wrapper div — gradient fills this, inner div sits on top leaving a 2px rim */
+.pearl-border {
+  background: conic-gradient(
+    from var(--pearl-angle),
+    #ffffff,
+    #ffc8ee,
+    #ffffff,
+    #c8f0ff,
+    #ffffff,
+    #e0c8ff,
+    #ffffff,
+    #ffc8ee
+  );
+  animation: pearlRotate 8s linear infinite;
+}
+
 /* ── VHS Glitch keyframe ─────────────────────────────────────────────────── */
 /* RGB channel separation via text-shadow + clip-path horizontal slice tears  */
 /* Using steps(1) for a hard digital-artifact look rather than smooth tweens  */
