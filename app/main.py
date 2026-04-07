@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from app.database import init_db
-from app.routes import admin, stream, watch
+from app.routes import admin, hls, stream, watch
 from app.routes import public_config as public_config_router
 
 FRONTEND_DIST = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
@@ -44,6 +44,7 @@ if os.getenv("DEV_MODE"):
 # ── API routes ────────────────────────────────────────────────────────────────
 app.include_router(watch.router,               prefix="/api")
 app.include_router(stream.router,              prefix="/api")
+app.include_router(hls.router,                 prefix="/api")
 app.include_router(admin.router,               prefix="/api")
 app.include_router(public_config_router.router, prefix="/api")
 
