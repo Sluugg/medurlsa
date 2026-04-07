@@ -45,10 +45,30 @@ function mountTranscodedAudio(container, streamUrl, durationSeconds, savedVolume
   let activeController = null
 
   function waitForSb() {
-    return new Promise(resolve => {
+    return new Promise((resolve, reject) => {
       if (!sb || !sb.updating) return resolve()
       sb.addEventListener('updateend', resolve, { once: true })
+      sb.addEventListener('error',     reject,  { once: true })
     })
+  }
+
+  // Append a chunk, evicting already-played data first if quota is exceeded.
+  async function appendChunk(chunk) {
+    try {
+      await waitForSb()
+      if (activeController.signal.aborted) return false
+      sb.appendBuffer(chunk)
+    } catch (e) {
+      if (e.name !== 'QuotaExceededError') throw e
+      // Evict data more than 30 s behind current playback position and retry once.
+      const evictTo = audio.currentTime - 30
+      if (evictTo <= 0) throw e
+      sb.remove(0, evictTo)
+      await waitForSb()
+      if (activeController.signal.aborted) return false
+      sb.appendBuffer(chunk)
+    }
+    return true
   }
 
   ms.addEventListener('sourceopen', async () => {
@@ -63,10 +83,22 @@ function mountTranscodedAudio(container, streamUrl, durationSeconds, savedVolume
       const reader = resp.body.getReader()
       while (true) {
         const { done, value } = await reader.read()
-        if (done) { ms.endOfStream(); break }
-        await waitForSb()
-        if (activeController.signal.aborted) break
-        sb.appendBuffer(value)
+        if (done) {
+          // The MSE spec truncates ms.duration to the highest buffered timestamp
+          // when endOfStream() is called.  Only call it if the transcode delivered
+          // the full expected content; otherwise leave the source open so the
+          // progress bar retains the correct total duration even if Jellyfin's
+          // FFmpeg exited early (corrupt frame, resource limit, etc.).
+          const bufferedEnd = sb.buffered.length > 0
+            ? sb.buffered.end(sb.buffered.length - 1)
+            : 0
+          if (!durationSeconds || bufferedEnd >= durationSeconds - 5) {
+            ms.endOfStream()
+          }
+          break
+        }
+        const ok = await appendChunk(value)
+        if (!ok) break
       }
     } catch (e) {
       if (e.name !== 'AbortError') console.error('Transcode stream error:', e)
