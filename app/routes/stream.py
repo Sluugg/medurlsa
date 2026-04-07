@@ -55,6 +55,7 @@ async def stream_media(
     uuid: str,
     client_id: str,
     request: Request,
+    start_ticks: int = 0,
     db: Connection = Depends(get_db),
 ):
     # ── 1. Validate link ───────────────────────────────────────────────────────
@@ -81,10 +82,19 @@ async def stream_media(
             raise HTTPException(status_code=403, detail="Client not registered for this link.")
 
     # ── 3. Build upstream request to Jellyfin ─────────────────────────────────
-    stream_url = build_stream_url(link["item_id"], link["item_type"])
+    needs_transcode = bool(link.get("needs_transcode", 0))
+    stream_url = build_stream_url(
+        link["item_id"],
+        link["item_type"],
+        needs_transcode=needs_transcode,
+        start_ticks=start_ticks,
+    )
 
     upstream_headers = {}
-    if "range" in request.headers:
+    # Range headers are only meaningful for static passthrough.
+    # Transcoded streams use StartTimeTicks for seeking; byte-range offsets
+    # into a live transcode output are undefined and confuse Jellyfin.
+    if not needs_transcode and "range" in request.headers:
         upstream_headers["Range"] = request.headers["range"]
 
     # ── 4. Open a streaming connection to Jellyfin and pipe to client ─────────

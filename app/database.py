@@ -67,6 +67,8 @@ async def init_db() -> None:
             "ALTER TABLE share_links ADD COLUMN background TEXT",
             "ALTER TABLE share_links ADD COLUMN flavor_text TEXT",
             "ALTER TABLE share_links ADD COLUMN item_artist TEXT",
+            "ALTER TABLE share_links ADD COLUMN needs_transcode INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE share_links ADD COLUMN duration_seconds INTEGER",
         ]:
             try:
                 await db.execute(ddl)

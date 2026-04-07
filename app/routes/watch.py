@@ -92,12 +92,14 @@ async def register_watch(
     await db.commit()
 
     return {
-        "status":         "ok",
-        "item_title":     link["item_title"],
-        "item_artist":    link["item_artist"],
-        "item_type":      link["item_type"],
-        "expires_at":     link["expires_at"],
-        "flavor_enabled": bool(link["flavor_enabled"]),
-        "background":     link["background"],
-        "flavor_text":    link["flavor_text"],
+        "status":           "ok",
+        "item_title":       link["item_title"],
+        "item_artist":      link["item_artist"],
+        "item_type":        link["item_type"],
+        "needs_transcode":  bool(link["needs_transcode"]),
+        "duration_seconds": link["duration_seconds"],
+        "expires_at":       link["expires_at"],
+        "flavor_enabled":   bool(link["flavor_enabled"]),
+        "background":       link["background"],
+        "flavor_text":      link["flavor_text"],
     }

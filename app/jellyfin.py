@@ -5,17 +5,32 @@ from app.config import JELLYFIN_URL, JELLYFIN_API_KEY
 # Item types that can be directly streamed
 STREAMABLE_TYPES = "Movie,Episode,Audio,MusicVideo"
 
+# Codecs that all modern browsers can decode natively without transcoding
+_BROWSER_AUDIO_CODECS = {"aac", "mp3", "opus", "vorbis", "flac"}
+
+
+def _check_needs_transcode(item: dict) -> bool:
+    """Return True if the item's audio codec is not natively supported by browsers."""
+    for stream in item.get("MediaStreams", []):
+        if stream.get("Type") == "Audio":
+            codec = (stream.get("Codec") or "").lower()
+            return codec not in _BROWSER_AUDIO_CODECS
+    return False
+
 
 def _parse_item(item: dict) -> dict:
-    ticks   = item.get("RunTimeTicks")
-    artists = item.get("Artists", [])
+    ticks     = item.get("RunTimeTicks")
+    artists   = item.get("Artists", [])
+    item_type = item.get("Type", "Unknown")
     return {
         "id":               item["Id"],
         "title":            item.get("Name", "Unknown"),
-        "type":             item.get("Type", "Unknown"),
+        "type":             item_type,
         "year":             item.get("ProductionYear"),
         "duration_seconds": int(ticks / 10_000_000) if ticks else None,
         "artist":           ", ".join(artists) if artists else None,
+        # Only populated when MediaStreams is included in the response (get_item, not search)
+        "needs_transcode":  _check_needs_transcode(item) if item_type == "Audio" else False,
     }
 
 
@@ -80,10 +95,12 @@ async def search_items(query: str, limit: int = 30) -> list[dict]:
 
 async def get_item(item_id: str) -> dict | None:
     # Use /Items?Ids= consistently — /Items/{id} requires UserId in some Jellyfin versions.
+    # MediaStreams is included here (not in search) because codec detection is only needed
+    # at link-creation time, and it adds payload overhead to search results.
     async with httpx.AsyncClient() as client:
         r = await client.get(f"{JELLYFIN_URL}/Items", params={
             "Ids":    item_id,
-            "Fields": "RunTimeTicks,ProductionYear,Artists",
+            "Fields": "RunTimeTicks,ProductionYear,Artists,MediaStreams",
             "api_key": JELLYFIN_API_KEY,
         }, timeout=10.0)
         if r.status_code == 404:
@@ -96,22 +113,26 @@ async def get_item(item_id: str) -> dict | None:
     return _parse_item(items[0])
 
 
-def build_stream_url(item_id: str, item_type: str) -> str:
+def build_stream_url(
+    item_id: str,
+    item_type: str,
+    needs_transcode: bool = False,
+    start_ticks: int = 0,
+) -> str:
     """Construct the internal Jellyfin stream URL for proxying.
 
-    Audio: request AAC-in-MP4 transcoding so codecs like ALAC that browsers
-    cannot decode natively are converted transparently by Jellyfin.  Omitting
-    `static=true` is what enables transcoding; the explicit AudioCodec and
-    Container parameters guarantee a browser-safe output format.
-
-    Video: keep static passthrough — transcoding video on-the-fly is expensive
-    and most video containers served by Jellyfin are already browser-compatible.
+    Audio (compatible codec): static=true — raw file bytes, Range-seekable.
+    Audio (incompatible codec, e.g. ALAC): transcode to raw ADTS AAC.
+        StartTimeTicks lets Jellyfin begin encoding from an arbitrary position,
+        which the MSE-based frontend player uses for seek support.
+    Video: static passthrough — transcoding video on-the-fly is expensive and
+        most containers served by Jellyfin are already browser-compatible.
     """
+    if item_type == "Audio" and needs_transcode:
+        params = f"AudioCodec=aac&Container=aac&api_key={JELLYFIN_API_KEY}"
+        if start_ticks:
+            params += f"&StartTimeTicks={start_ticks}"
+        return f"{JELLYFIN_URL}/Audio/{item_id}/stream?{params}"
     if item_type == "Audio":
-        path = f"/Audio/{item_id}/stream"
-        return (
-            f"{JELLYFIN_URL}{path}"
-            f"?AudioCodec=aac&Container=mp4&api_key={JELLYFIN_API_KEY}"
-        )
-    path = f"/Videos/{item_id}/stream"
-    return f"{JELLYFIN_URL}{path}?static=true&api_key={JELLYFIN_API_KEY}"
+        return f"{JELLYFIN_URL}/Audio/{item_id}/stream?static=true&api_key={JELLYFIN_API_KEY}"
+    return f"{JELLYFIN_URL}/Videos/{item_id}/stream?static=true&api_key={JELLYFIN_API_KEY}"

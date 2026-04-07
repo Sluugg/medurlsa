@@ -138,7 +138,12 @@ export default function WatchPage() {
           )}
 
           {/* Player */}
-          <VideoPlayer streamUrl={streamUrl} isVideo={isVideo} />
+          <VideoPlayer
+            streamUrl={streamUrl}
+            isVideo={isVideo}
+            needsTranscode={media.needs_transcode ?? false}
+            durationSeconds={media.duration_seconds ?? null}
+          />
 
           {/* Expiry notice */}
           {expiry && (
