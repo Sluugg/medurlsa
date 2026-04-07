@@ -55,7 +55,7 @@ body {
   inset: 0;
   border-radius: inherit;
   padding: var(--pearl-border-width, 2px);
-  background: conic-gradient(
+/*  background: conic-gradient(
     from var(--pearl-angle),
     #ffffff,
     #ffc8ee,
@@ -65,6 +65,17 @@ body {
     #e0c8ff,
     #ffffff,
     #ffc8ee
+  ); */
+background: conic-gradient(
+    from var(--pearl-angle),
+    #ffffff,
+    #ffade5,
+    #ffffff,
+    #9cdfff,
+    #ffffff,
+    #cba3ff,
+    #ffffff,
+    #ffade5
   );
   /* XOR mask: visible only where the full-element layer covers but the
      content-box layer does not — i.e. only the border strip. */
