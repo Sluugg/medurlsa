@@ -18,12 +18,22 @@
 import { useEffect, useRef } from 'react'
 
 // ── MSE transcoded-audio player ──────────────────────────────────────────────
+//
+// Jellyfin's simple audio transcoding endpoint does not reliably honour
+// StartTimeTicks, so server-side seek restarts don't work.  Instead we stream
+// the full transcoded output into the MSE buffer from the start and let the
+// browser seek natively within whatever has been buffered.  FFmpeg transcodes
+// audio well above real-time, so the buffer fills quickly; seeking ahead of
+// the buffer causes a brief stall (not a restart) until data arrives.
+//
+// Setting MediaSource.duration from the stored item value makes the progress
+// bar fully interactive even before the buffer reaches the end.
 
-function mountTranscodedAudio(container, streamBaseUrl, durationSeconds, savedVolume) {
+function mountTranscodedAudio(container, streamUrl, durationSeconds, savedVolume) {
   const audio = document.createElement('audio')
-  audio.controls     = true
-  audio.style.width  = '100%'
-  audio.className    = 'w-full rounded'
+  audio.controls    = true
+  audio.style.width = '100%'
+  audio.className   = 'w-full rounded'
   if (savedVolume !== null) audio.volume = parseFloat(savedVolume)
 
   const ms        = new MediaSource()
@@ -33,7 +43,6 @@ function mountTranscodedAudio(container, streamBaseUrl, durationSeconds, savedVo
 
   let sb               = null
   let activeController = null
-  let seekVersion      = 0
 
   function waitForSb() {
     return new Promise(resolve => {
@@ -42,59 +51,26 @@ function mountTranscodedAudio(container, streamBaseUrl, durationSeconds, savedVo
     })
   }
 
-  async function fetchAndAppend(startTicks, timeOffset, version) {
-    if (activeController) activeController.abort()
-    const ctrl = new AbortController()
-    activeController = ctrl
+  ms.addEventListener('sourceopen', async () => {
+    if (durationSeconds) ms.duration = durationSeconds
+    sb = ms.addSourceBuffer('audio/aac')
 
-    const url = `${streamBaseUrl}&start_ticks=${startTicks}`
+    activeController = new AbortController()
     try {
-      const resp = await fetch(url, { signal: ctrl.signal })
+      const resp = await fetch(streamUrl, { signal: activeController.signal })
       if (!resp.ok) throw new Error(`upstream ${resp.status}`)
 
-      sb.timestampOffset = timeOffset
       const reader = resp.body.getReader()
-
       while (true) {
         const { done, value } = await reader.read()
-        if (done) {
-          if (!ctrl.signal.aborted && version === seekVersion) ms.endOfStream()
-          break
-        }
+        if (done) { ms.endOfStream(); break }
         await waitForSb()
-        if (ctrl.signal.aborted || version !== seekVersion) break
+        if (activeController.signal.aborted) break
         sb.appendBuffer(value)
       }
     } catch (e) {
       if (e.name !== 'AbortError') console.error('Transcode stream error:', e)
     }
-  }
-
-  ms.addEventListener('sourceopen', () => {
-    if (durationSeconds) ms.duration = durationSeconds
-    sb = ms.addSourceBuffer('audio/aac')
-
-    audio.addEventListener('seeking', async () => {
-      const version  = ++seekVersion
-      const seekTime = audio.currentTime
-
-      if (activeController) activeController.abort()
-      await waitForSb()
-      if (version !== seekVersion) return
-
-      sb.abort()
-      const end = isFinite(ms.duration) ? ms.duration : Number.MAX_SAFE_INTEGER
-      if (sb.buffered.length > 0) {
-        sb.remove(0, end)
-        await waitForSb()
-      }
-      if (version !== seekVersion) return
-
-      const ticks = Math.round(seekTime * 10_000_000)
-      await fetchAndAppend(ticks, seekTime, version)
-    })
-
-    fetchAndAppend(0, 0, seekVersion)
   }, { once: true })
 
   return function cleanup() {
