@@ -94,8 +94,14 @@ export default function WatchPage() {
   }
 
   // ── Player ─────────────────────────────────────────────────────────────────
-  const streamUrl = `/api/stream/${uuid}?client_id=${encodeURIComponent(clientId)}`
-  const isVideo   = media.item_type !== 'Audio'
+  const isVideo        = media.item_type !== 'Audio'
+  const needsTranscode = !isVideo && (media.needs_transcode ?? false)
+
+  // Transcoded audio uses the HLS playlist endpoint; everything else uses the
+  // direct stream proxy which forwards Range headers for native seeking.
+  const streamUrl = needsTranscode
+    ? `/api/hls/${uuid}/playlist.m3u8?client_id=${encodeURIComponent(clientId)}`
+    : `/api/stream/${uuid}?client_id=${encodeURIComponent(clientId)}`
   const expiry    = formatExpiry(media.expires_at)
 
   return (
@@ -141,8 +147,7 @@ export default function WatchPage() {
           <VideoPlayer
             streamUrl={streamUrl}
             isVideo={isVideo}
-            needsTranscode={media.needs_transcode ?? false}
-            durationSeconds={media.duration_seconds ?? null}
+            needsTranscode={needsTranscode}
           />
 
           {/* Expiry notice */}
