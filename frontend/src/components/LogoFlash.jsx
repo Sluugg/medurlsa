@@ -61,7 +61,7 @@ export default function LogoFlash({ hasLogo, timing }) {
     return () => clearTimeout(tid.current)
   }, [hasLogo, lf.interval_min_s, lf.interval_max_s, lf.duration_ms])
 
-  if (!visible || !hasLogo) return null
+  if (!hasLogo) return null
 
   return (
     <img
@@ -80,6 +80,7 @@ export default function LogoFlash({ hasLogo, timing }) {
         pointerEvents: 'none',
         filter:      'drop-shadow(0 0 6px rgba(191, 0, 255, 0.65))',
         zIndex:      20,
+        visibility:  visible ? 'visible' : 'hidden',
       }}
     />
   )
