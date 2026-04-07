@@ -129,7 +129,11 @@ def build_stream_url(
         most containers served by Jellyfin are already browser-compatible.
     """
     if item_type == "Audio" and needs_transcode:
-        params = f"AudioCodec=aac&Container=aac&api_key={JELLYFIN_API_KEY}"
+        # MP3 (audio/mpeg) is used rather than AAC ADTS (audio/aac) because
+        # Chrome's MSE implementation for audio/mpeg handles long tracks and
+        # buffer eviction more reliably.  Chrome's audio/aac SourceBuffer has
+        # an ~12 MB hard limit which a 6-minute track at 256 kbps hits exactly.
+        params = f"AudioCodec=mp3&Container=mp3&api_key={JELLYFIN_API_KEY}"
         if start_ticks:
             params += f"&StartTimeTicks={start_ticks}"
         return f"{JELLYFIN_URL}/Audio/{item_id}/stream?{params}"

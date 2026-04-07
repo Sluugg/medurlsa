@@ -44,36 +44,20 @@ function mountTranscodedAudio(container, streamUrl, durationSeconds, savedVolume
   let sb               = null
   let activeController = null
 
+  // Wait for any in-progress SourceBuffer operation to complete.
+  // Only listens for updateend — the error event delivers a DOM Event object
+  // (not an Error), so mixing it here causes type confusion in callers.
+  // SourceBuffer errors are caught instead via the ms.readyState guard below.
   function waitForSb() {
-    return new Promise((resolve, reject) => {
+    return new Promise(resolve => {
       if (!sb || !sb.updating) return resolve()
       sb.addEventListener('updateend', resolve, { once: true })
-      sb.addEventListener('error',     reject,  { once: true })
     })
-  }
-
-  // Append a chunk, evicting already-played data first if quota is exceeded.
-  async function appendChunk(chunk) {
-    try {
-      await waitForSb()
-      if (activeController.signal.aborted) return false
-      sb.appendBuffer(chunk)
-    } catch (e) {
-      if (e.name !== 'QuotaExceededError') throw e
-      // Evict data more than 30 s behind current playback position and retry once.
-      const evictTo = audio.currentTime - 30
-      if (evictTo <= 0) throw e
-      sb.remove(0, evictTo)
-      await waitForSb()
-      if (activeController.signal.aborted) return false
-      sb.appendBuffer(chunk)
-    }
-    return true
   }
 
   ms.addEventListener('sourceopen', async () => {
     if (durationSeconds) ms.duration = durationSeconds
-    sb = ms.addSourceBuffer('audio/aac')
+    sb = ms.addSourceBuffer('audio/mpeg')
 
     activeController = new AbortController()
     try {
@@ -83,6 +67,7 @@ function mountTranscodedAudio(container, streamUrl, durationSeconds, savedVolume
       const reader = resp.body.getReader()
       while (true) {
         const { done, value } = await reader.read()
+
         if (done) {
           // The MSE spec truncates ms.duration to the highest buffered timestamp
           // when endOfStream() is called.  Only call it if the transcode delivered
@@ -97,8 +82,32 @@ function mountTranscodedAudio(container, streamUrl, durationSeconds, savedVolume
           }
           break
         }
-        const ok = await appendChunk(value)
-        if (!ok) break
+
+        await waitForSb()
+
+        // A SourceBuffer error causes the MSE spec to call endOfStream("decode"),
+        // transitioning readyState from "open" to "ended".  Attempting appendBuffer
+        // on a non-open MediaSource throws InvalidStateError, so bail out here.
+        if (activeController.signal.aborted || ms.readyState !== 'open') break
+
+        let appended = false
+        try {
+          sb.appendBuffer(value)
+          appended = true
+        } catch (e) {
+          if (e.name === 'QuotaExceededError') {
+            // Evict already-played data and retry once
+            const evictTo = audio.currentTime - 30
+            if (evictTo > 0) {
+              sb.remove(0, evictTo)
+              await waitForSb()
+              if (activeController.signal.aborted || ms.readyState !== 'open') break
+              try { sb.appendBuffer(value); appended = true } catch { /* fall through */ }
+            }
+          }
+          // Any unrecoverable error — stop buffering cleanly
+          if (!appended) break
+        }
       }
     } catch (e) {
       if (e.name !== 'AbortError') console.error('Transcode stream error:', e)
