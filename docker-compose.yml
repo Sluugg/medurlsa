@@ -1,0 +1,28 @@
+# Before first run: mkdir -p data backgrounds && chown -R 1000:1000 data backgrounds
+# The container runs as a non-root user pinned to UID/GID 1000 — since bind
+# mounts take the host directory's ownership as-is, the app can't write to
+# ./data (or ./backgrounds) unless the host directories are owned by 1000:1000
+# first.
+
+services:
+  web-share-app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Overrides whatever DB_PATH/BACKGROUNDS_DIR say in .env — that file is
+      # written for a native (non-Docker) install, where those are host
+      # paths. Inside the container they're fixed by the volumes below.
+      DB_PATH: /app/data/links.db
+      BACKGROUNDS_DIR: /app/backgrounds
+    volumes:
+      - ./data:/app/data
+      - ./backgrounds:/app/backgrounds
+      # Uncomment to use a custom content_config.json (site title, logo,
+      # flavor text, timing). Create the file first — e.g.
+      # `cp content_config.example.json content_config.json` — Docker will
+      # mount an empty directory instead of a file if the source is missing.
+      # - ./content_config.json:/app/content_config.json:ro

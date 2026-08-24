@@ -1,0 +1,25 @@
+# Secrets and local runtime state — never bake these into an image layer
+.env
+.env.*
+!.env.example
+content_config.json
+data/
+backgrounds/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Frontend — rebuilt inside the image, host-installed node_modules is
+# platform-specific and must not be copied in
+frontend/node_modules/
+frontend/dist/
+
+# VCS / docs / editor cruft — irrelevant to the build, just bloats context
+.git/
+.gitignore
+*.md
+.claude/

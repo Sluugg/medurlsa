@@ -21,26 +21,26 @@ export default function TitleBanner({ siteTitle, timing, fonts }) {
   const [isCycling,   setIsCycling]   = useState(false)
   const [jitterPhase, setJitterPhase] = useState(0)
 
-  const gt = timing?.glitch        ?? {}
-  const ct = timing?.color_cycle  ?? {}
-  const jt = timing?.jitter       ?? {}
-  const pb = timing?.pearl_border ?? {}
-  const tf = fonts?.title         ?? {}
+  const gt = timing.glitch
+  const ct = timing.color_cycle
+  const jt = timing.jitter
+  const pb = timing.pearl_border
+  const tf = fonts.title
 
   // ── Glitch loop ─────────────────────────────────────────────────────────────
   useEffect(() => {
     let tid
     function schedule() {
       const delay = rand(
-        (gt.interval_min_s ?? 8)  * 1000,
-        (gt.interval_max_s ?? 20) * 1000,
+        gt.interval_min_s * 1000,
+        gt.interval_max_s * 1000,
       )
       tid = setTimeout(() => {
         setGlitching(true)
         tid = setTimeout(() => {
           setGlitching(false)
           schedule()
-        }, gt.duration_ms ?? 400)
+        }, gt.duration_ms)
       }, delay)
     }
     schedule()
@@ -53,27 +53,27 @@ export default function TitleBanner({ siteTitle, timing, fonts }) {
     let tid
     function schedule() {
       const delay = rand(
-        (ct.interval_min_s ?? 15) * 1000,
-        (ct.interval_max_s ?? 40) * 1000,
+        ct.interval_min_s * 1000,
+        ct.interval_max_s * 1000,
       )
       tid = setTimeout(() => {
         setIsCycling(true)
         tid = setTimeout(() => {
           setIsCycling(false)
           schedule()
-        }, ct.duration_ms ?? 3000)
+        }, ct.duration_ms)
       }, delay)
     }
     schedule()
     return () => clearTimeout(tid)
   }, [ct.interval_min_s, ct.interval_max_s, ct.duration_ms])
 
-  const glitchDuration  = gt.duration_ms    ?? 400
-  const cycleDuration   = ct.duration_ms    ?? 3000
-  const jitterDelayMs   = jt.delay_ms       ?? 300
-  const jitterDistPx    = jt.distance_px    ?? 4
-  const pearlCycleRate  = pb.cycle_rate_s   ?? 8
-  const pearlBorderWidth = pb.border_width_px ?? 2
+  const glitchDuration    = gt.duration_ms
+  const cycleDuration     = ct.duration_ms
+  const jitterDelayMs     = jt.delay_ms
+  const jitterDistPx      = jt.distance_px
+  const pearlCycleRate    = pb.cycle_rate_s
+  const pearlBorderWidth  = pb.border_width_px
 
   // ── Jitter loop ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -102,16 +102,16 @@ export default function TitleBanner({ siteTitle, timing, fonts }) {
       >
         <div
           style={{
-            fontFamily:    tf.family ?? "'VCROSDMono', 'Courier New', monospace",
-            fontSize:      tf.size   ?? '1.25rem',
-            fontWeight:    tf.weight ?? 'bold',
+            fontFamily:    tf.family,
+            fontSize:      tf.size,
+            fontWeight:    tf.weight,
             letterSpacing: '0.15em',
             userSelect:    'none',
             color:         isCycling ? undefined : '#ffffff',
             animation:     animations,
           }}
         >
-          {[...(siteTitle ?? 'dopelink')].map((char, i) => (
+          {[...siteTitle].map((char, i) => (
             <span
               key={i}
               style={{

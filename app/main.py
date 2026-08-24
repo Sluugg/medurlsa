@@ -3,11 +3,13 @@ import os
 import re
 from contextlib import asynccontextmanager
 
+import aiosqlite
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 
+from app.config import DB_PATH
 from app.database import init_db
 from app.routes import admin, hls, stream, watch
 from app.routes import public_config as public_config_router
@@ -77,21 +79,39 @@ if os.path.isdir(FRONTEND_DIST):
             from app.config import PUBLIC_BASE_URL
 
             uuid       = full_path.split("/", 1)[1]
-            site_title = html.escape(CONTENT_CONFIG.get("site_title", "dopelink"))
-            og_image   = html.escape(f"{PUBLIC_BASE_URL}/api/image/{uuid}")
-            og_url     = html.escape(f"{PUBLIC_BASE_URL}/stream/{uuid}")
+            site_title = CONTENT_CONFIG["site_title"]
+
+            async with aiosqlite.connect(DB_PATH) as db:
+                db.row_factory = aiosqlite.Row
+                async with db.execute(
+                    "SELECT item_title, item_artist FROM share_links WHERE uuid = ?", (uuid,)
+                ) as cur:
+                    link = await cur.fetchone()
+
+            # The URL is already shown above the title in link previews, so use
+            # the track/artist info there instead of repeating the site name.
+            if link and link["item_artist"]:
+                preview_title = f"{link['item_artist']} - {link['item_title']}"
+            elif link:
+                preview_title = link["item_title"]
+            else:
+                preview_title = site_title
+
+            preview_title = html.escape(preview_title)
+            og_image      = html.escape(f"{PUBLIC_BASE_URL}/api/image/{uuid}")
+            og_url        = html.escape(f"{PUBLIC_BASE_URL}/stream/{uuid}")
 
             with open(_INDEX_HTML, "r", encoding="utf-8") as f:
                 raw_html = f.read()
 
             og = (
-                f'<meta property="og:type"        content="video.other" />\n'
-                f'<meta property="og:site_name"   content="{site_title}" />\n'
-                f'<meta property="og:title"       content="{site_title}" />\n'
+                f'<meta property="og:type"        content="website" />\n'
+                f'<meta property="og:site_name"   content="{html.escape(site_title)}" />\n'
+                f'<meta property="og:title"       content="{preview_title}" />\n'
                 f'<meta property="og:image"       content="{og_image}" />\n'
                 f'<meta property="og:url"         content="{og_url}" />\n'
                 f'<meta name="twitter:card"       content="summary_large_image" />\n'
-                f'<meta name="twitter:title"      content="{site_title}" />\n'
+                f'<meta name="twitter:title"      content="{preview_title}" />\n'
                 f'<meta name="twitter:image"      content="{og_image}" />\n'
             )
             raw_html = raw_html.replace("</head>", og + "</head>", 1)

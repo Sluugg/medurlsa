@@ -7,6 +7,22 @@ function authHeaders(token) {
   return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
 }
 
+const UNREACHABLE_MSG = 'Could not reach the server — is the backend running?'
+
+// Extracts a displayable message from a failed fetch response. FastAPI error
+// responses are JSON with a `detail` string; a response that isn't valid JSON
+// (e.g. the dev proxy's own error page when the backend is down) means we
+// aren't actually talking to the API, so treat it the same as unreachable.
+async function apiErrorMessage(r) {
+  let body
+  try {
+    body = await r.json()
+  } catch {
+    return UNREACHABLE_MSG
+  }
+  return (body && typeof body.detail === 'string') ? body.detail : `Server error (${r.status}).`
+}
+
 function formatDate(iso) {
   if (!iso) return '—'
   return new Date(iso + 'Z').toLocaleString()
@@ -29,6 +45,69 @@ const VIDEO_EXTS = new Set(['.webm', '.mp4', '.mov', '.avi'])
 function fileExt(name) {
   const i = name.lastIndexOf('.')
   return i >= 0 ? name.slice(i).toLowerCase() : ''
+}
+
+const MEDIA_TYPES = [
+  { value: 'Movie',      label: 'Movies' },
+  { value: 'Episode',    label: 'Episodes' },
+  { value: 'Audio',      label: 'Music' },
+  { value: 'MusicVideo', label: 'Music Videos' },
+]
+
+// ── LibraryFilter ─────────────────────────────────────────────────────────────
+// Collapsed multi-select: libraries vary in number/name per server, so they're
+// tucked behind a dropdown instead of always-visible chips like media type.
+
+function LibraryFilter({ libraries, selected, onToggle }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    function onClickOutside(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [])
+
+  const label =
+    selected.size === 0 ? 'All libraries'
+    : selected.size === 1 ? (libraries.find(l => l.id === [...selected][0])?.name ?? '1 library')
+    : `${selected.size} libraries`
+
+  return (
+    <div className="relative inline-block" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1.5 bg-gray-800 border border-gray-600 rounded-full px-3 py-1 text-xs text-gray-300 hover:border-gray-400"
+      >
+        {label}
+        <span className="text-gray-500">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div className="absolute z-10 mt-1 w-56 max-h-60 overflow-y-auto bg-gray-800 border border-gray-600 rounded shadow-lg p-1">
+          {libraries.length === 0 && (
+            <p className="text-xs text-gray-500 px-2 py-1.5">No libraries found.</p>
+          )}
+          {libraries.map(lib => (
+            <label
+              key={lib.id}
+              className="flex items-center gap-2 px-2 py-1.5 text-sm text-gray-300 hover:bg-gray-700 rounded cursor-pointer"
+            >
+              <input
+                type="checkbox"
+                checked={selected.has(lib.id)}
+                onChange={() => onToggle(lib.id)}
+                className="rounded accent-purple-500"
+              />
+              {lib.name}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ── BackgroundThumb ───────────────────────────────────────────────────────────
@@ -82,14 +161,20 @@ function LoginForm({ onLogin }) {
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
-    const r = await fetch('/api/admin/links', {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    let r
+    try {
+      r = await fetch('/api/admin/links', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+    } catch {
+      setError(UNREACHABLE_MSG)
+      return
+    }
     if (r.ok) {
       sessionStorage.setItem('admin_token', token)
       onLogin(token)
     } else {
-      setError('Invalid token.')
+      setError(await apiErrorMessage(r))
     }
   }
 
@@ -115,10 +200,23 @@ function LoginForm({ onLogin }) {
 
 // ── CreateLinkModal ───────────────────────────────────────────────────────────
 
+// Formats a Date as the local value a <input type="datetime-local"> expects (YYYY-MM-DDTHH:mm).
+function toDatetimeLocal(date) {
+  const pad = n => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+const DEFAULT_EXPIRES_AT  = toDatetimeLocal(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))
+const DEFAULT_MAX_USES    = '15'
+const DEFAULT_MAX_CLIENTS = '5'
+
 function CreateLinkModal({ item, token, availableBackgrounds, onCreated, onClose }) {
-  const [expiresAt, setExpiresAt]           = useState('')
-  const [maxUses, setMaxUses]               = useState('')
-  const [maxClients, setMaxClients]         = useState('')
+  const [expiresAt, setExpiresAt]           = useState(DEFAULT_EXPIRES_AT)
+  const [neverExpires, setNeverExpires]     = useState(false)
+  const [maxUses, setMaxUses]               = useState(DEFAULT_MAX_USES)
+  const [unlimitedUses, setUnlimitedUses]   = useState(false)
+  const [maxClients, setMaxClients]         = useState(DEFAULT_MAX_CLIENTS)
+  const [unlimitedClients, setUnlimitedClients] = useState(false)
   const [notes, setNotes]                   = useState('')
   const [flavorEnabled, setFlavorEnabled]   = useState(true)
   const [background, setBackground]         = useState('')     // '' = random
@@ -133,26 +231,32 @@ function CreateLinkModal({ item, token, availableBackgrounds, onCreated, onClose
     setLoading(true)
     const body = {
       item_id:        item.id,
-      expires_at:     expiresAt || null,
-      max_uses:       maxUses    ? parseInt(maxUses)    : null,
-      max_clients:    maxClients ? parseInt(maxClients) : null,
+      expires_at:     (!neverExpires && expiresAt) ? expiresAt : null,
+      max_uses:       (!unlimitedUses && maxUses)     ? parseInt(maxUses)    : null,
+      max_clients:    (!unlimitedClients && maxClients) ? parseInt(maxClients) : null,
       notes:          notes || null,
       flavor_enabled: flavorEnabled,
       background:     background || null,
       flavor_text:    customFlavorText || null,
     }
-    const r = await fetch('/api/admin/links', {
-      method:  'POST',
-      headers: authHeaders(token),
-      body:    JSON.stringify(body),
-    })
+    let r
+    try {
+      r = await fetch('/api/admin/links', {
+        method:  'POST',
+        headers: authHeaders(token),
+        body:    JSON.stringify(body),
+      })
+    } catch {
+      setLoading(false)
+      setError(UNREACHABLE_MSG)
+      return
+    }
     setLoading(false)
     if (r.ok) {
       setResult(await r.json())
       onCreated()
     } else {
-      const err = await r.json().catch(() => ({}))
-      setError(err.detail ?? 'Failed to create link.')
+      setError(await apiErrorMessage(r))
     }
   }
 
@@ -173,16 +277,65 @@ function CreateLinkModal({ item, token, availableBackgrounds, onCreated, onClose
 
             {/* Standard fields */}
             <div>
-              <label className={labelCls}>Expires at (leave blank for no expiry)</label>
-              <input type="datetime-local" value={expiresAt} onChange={e => setExpiresAt(e.target.value)} className={inputCls} />
+              <label className={labelCls}>Expires at</label>
+              <input
+                type="datetime-local"
+                value={expiresAt}
+                onChange={e => setExpiresAt(e.target.value)}
+                disabled={neverExpires}
+                className={`${inputCls} disabled:opacity-50`}
+              />
+              <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer mt-2">
+                <input
+                  type="checkbox"
+                  checked={neverExpires}
+                  onChange={e => setNeverExpires(e.target.checked)}
+                  className="rounded accent-purple-500"
+                />
+                No expiration
+              </label>
             </div>
             <div>
-              <label className={labelCls}>Max total views (leave blank for unlimited)</label>
-              <input type="number" min="1" value={maxUses} onChange={e => setMaxUses(e.target.value)} placeholder="e.g. 10" className={inputCls} />
+              <label className={labelCls}>Max total views</label>
+              <input
+                type="number"
+                min="1"
+                value={maxUses}
+                onChange={e => setMaxUses(e.target.value)}
+                placeholder="e.g. 10"
+                disabled={unlimitedUses}
+                className={`${inputCls} disabled:opacity-50`}
+              />
+              <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer mt-2">
+                <input
+                  type="checkbox"
+                  checked={unlimitedUses}
+                  onChange={e => setUnlimitedUses(e.target.checked)}
+                  className="rounded accent-purple-500"
+                />
+                Unlimited
+              </label>
             </div>
             <div>
-              <label className={labelCls}>Max unique viewers (leave blank for unlimited)</label>
-              <input type="number" min="1" value={maxClients} onChange={e => setMaxClients(e.target.value)} placeholder="e.g. 3" className={inputCls} />
+              <label className={labelCls}>Max unique viewers</label>
+              <input
+                type="number"
+                min="1"
+                value={maxClients}
+                onChange={e => setMaxClients(e.target.value)}
+                placeholder="e.g. 3"
+                disabled={unlimitedClients}
+                className={`${inputCls} disabled:opacity-50`}
+              />
+              <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer mt-2">
+                <input
+                  type="checkbox"
+                  checked={unlimitedClients}
+                  onChange={e => setUnlimitedClients(e.target.checked)}
+                  className="rounded accent-purple-500"
+                />
+                Unlimited
+              </label>
             </div>
             <div>
               <label className={labelCls}>Notes (optional)</label>
@@ -278,6 +431,9 @@ export default function AdminPage() {
   const [results, setResults]       = useState([])
   const [searching, setSearching]   = useState(false)
   const [selectedItem, setSelected] = useState(null)
+  const [libraries, setLibraries]   = useState([])
+  const [selectedTypes, setSelectedTypes]         = useState(() => new Set(MEDIA_TYPES.map(t => t.value)))
+  const [selectedLibraries, setSelectedLibraries] = useState(() => new Set())
   const searchTimer                 = useRef(null)
   const { config }                  = useConfig()
 
@@ -290,19 +446,59 @@ export default function AdminPage() {
 
   useEffect(() => { if (isLoggedIn) loadLinks() }, [isLoggedIn])
 
-  // Debounced Jellyfin search
+  useEffect(() => {
+    if (!isLoggedIn) return
+    fetch('/api/admin/libraries', { headers: authHeaders(token) })
+      .then(r => r.ok ? r.json() : [])
+      .then(setLibraries)
+      .catch(() => {})
+  }, [isLoggedIn])
+
+  function toggleType(value) {
+    setSelectedTypes(prev => {
+      const next = new Set(prev)
+      next.has(value) ? next.delete(value) : next.add(value)
+      return next
+    })
+  }
+
+  function toggleLibrary(id) {
+    setSelectedLibraries(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  // Debounced Jellyfin search. Aborts any still-in-flight request whenever the
+  // query/filters change again, so a slow, now-stale response can never land
+  // after (and overwrite) a faster, more recent one.
   useEffect(() => {
     if (!searchQuery.trim()) { setResults([]); return }
     clearTimeout(searchTimer.current)
+    const controller = new AbortController()
     searchTimer.current = setTimeout(async () => {
       setSearching(true)
-      const r = await fetch(`/api/admin/search?q=${encodeURIComponent(searchQuery)}`,
-        { headers: authHeaders(token) })
-      setSearching(false)
-      if (r.ok) setResults(await r.json())
+      const params = new URLSearchParams({ q: searchQuery })
+      if (selectedTypes.size > 0)     params.set('item_types',  [...selectedTypes].join(','))
+      if (selectedLibraries.size > 0) params.set('library_ids', [...selectedLibraries].join(','))
+      try {
+        const r = await fetch(`/api/admin/search?${params}`, {
+          headers: authHeaders(token),
+          signal:  controller.signal,
+        })
+        if (r.ok) setResults(await r.json())
+      } catch (err) {
+        if (err.name !== 'AbortError') throw err
+      } finally {
+        if (!controller.signal.aborted) setSearching(false)
+      }
     }, 350)
-    return () => clearTimeout(searchTimer.current)
-  }, [searchQuery, token])
+    return () => {
+      clearTimeout(searchTimer.current)
+      controller.abort()
+    }
+  }, [searchQuery, token, selectedTypes, selectedLibraries])
 
   async function handleDelete(uuid) {
     if (!confirm('Delete this link permanently?')) return
@@ -344,6 +540,31 @@ export default function AdminPage() {
           placeholder="Search Jellyfin library…"
           className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
         />
+
+        {/* Search filters */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs text-gray-500 mr-0.5">Type:</span>
+            {MEDIA_TYPES.map(t => (
+              <button
+                key={t.value}
+                type="button"
+                onClick={() => toggleType(t.value)}
+                className={`text-xs rounded-full px-3 py-1 border transition-colors
+                  ${selectedTypes.has(t.value)
+                    ? 'bg-blue-600 border-blue-500 text-white'
+                    : 'bg-gray-800 border-gray-600 text-gray-400 hover:border-gray-400'}`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-gray-500 mr-0.5">Library:</span>
+            <LibraryFilter libraries={libraries} selected={selectedLibraries} onToggle={toggleLibrary} />
+          </div>
+        </div>
+
         {searching && <p className="text-gray-500 text-sm">Searching…</p>}
         {results.length > 0 && (
           <ul className="divide-y divide-gray-800 rounded-lg overflow-hidden border border-gray-700">

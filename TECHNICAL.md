@@ -49,8 +49,13 @@ Browser loads /stream/{uuid}
 Admin loads /admin
   → React app renders login form
   → Admin submits token → validated against ADMIN_TOKEN in .env
-  → Admin searches by title → GET /api/admin/search?q={query}
-      → server queries Jellyfin /Items?searchTerm=... with stored API key
+  → GET /api/admin/libraries fetches the server's top-level libraries once,
+    for the library filter checklist (Jellyfin /Library/VirtualFolders)
+  → Admin searches by title, optionally narrowed by media type (chips) and/or
+    library (checklist) → GET /api/admin/search?q={query}&item_types=...&library_ids=...
+      → server queries Jellyfin /Items?searchTerm=... (and /Artists for
+        artist-name matches) once per selected library — Jellyfin's ParentId
+        filter takes one value, not a list — merging and deduplicating results
       → returns list of streamable items (Movie, Episode, Audio, MusicVideo)
   → Admin selects item, configures link options, submits
   → POST /api/admin/links

@@ -35,16 +35,16 @@ export default function FlavorText({ texts, timing, fonts }) {
   const [pos, setPos]         = useState({ top: '5%', left: '5%' })
   const tid = useRef(null)
 
-  const ft = timing?.flavor_text ?? {}
-  const ff = fonts?.flavor_text  ?? {}
+  const ft = timing.flavor_text
+  const ff = fonts.flavor_text
 
   useEffect(() => {
     if (!texts || texts.length === 0) return
 
     function schedule() {
       const delay = rand(
-        (ft.interval_min_s ?? 12) * 1000,
-        (ft.interval_max_s ?? 25) * 1000,
+        ft.interval_min_s * 1000,
+        ft.interval_max_s * 1000,
       )
       tid.current = setTimeout(() => {
         setText(texts[Math.floor(Math.random() * texts.length)])
@@ -56,7 +56,7 @@ export default function FlavorText({ texts, timing, fonts }) {
           requestAnimationFrame(() => setOpacity(1))
         )
 
-        const holdMs = ft.duration_ms ?? 4000
+        const holdMs = ft.duration_ms
         tid.current = setTimeout(() => {
           setOpacity(0)
           tid.current = setTimeout(() => {
@@ -81,9 +81,9 @@ export default function FlavorText({ texts, timing, fonts }) {
         left:        pos.left,
         opacity,
         transition:  `opacity ${FADE_MS}ms ease`,
-        fontFamily:  ff.family ?? "'VCROSDMono', 'Courier New', monospace",
-        fontSize:    ff.size   ?? '0.7rem',
-        fontWeight:  ff.weight ?? 'normal',
+        fontFamily:  ff.family,
+        fontSize:    ff.size,
+        fontWeight:  ff.weight,
         color:       '#c0b8ff',
         textShadow:  '0 0 8px rgba(192, 184, 255, 0.7)',
         pointerEvents: 'none',

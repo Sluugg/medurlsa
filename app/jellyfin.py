@@ -1,6 +1,9 @@
 import asyncio
+import logging
 import httpx
 from app.config import JELLYFIN_URL, JELLYFIN_API_KEY
+
+logger = logging.getLogger(__name__)
 
 # Item types that can be directly streamed
 STREAMABLE_TYPES = "Movie,Episode,Audio,MusicVideo"
@@ -34,63 +37,113 @@ def _parse_item(item: dict) -> dict:
     }
 
 
-async def _search_by_title(query: str, client: httpx.AsyncClient, limit: int) -> list[dict]:
-    r = await client.get(f"{JELLYFIN_URL}/Items", params={
+async def _search_by_title(
+    query: str,
+    client: httpx.AsyncClient,
+    limit: int,
+    item_types: str,
+    parent_id: str | None,
+) -> list[dict]:
+    params = {
         "searchTerm":       query,
         "Recursive":        "true",
-        "IncludeItemTypes": STREAMABLE_TYPES,
+        "IncludeItemTypes": item_types,
         "Limit":            limit,
         "Fields":           "RunTimeTicks,ProductionYear,Artists",
         "api_key":          JELLYFIN_API_KEY,
-    }, timeout=10.0)
+    }
+    if parent_id:
+        params["ParentId"] = parent_id
+    r = await client.get(f"{JELLYFIN_URL}/Items", params=params, timeout=10.0)
     r.raise_for_status()
     return [_parse_item(i) for i in r.json().get("Items", [])]
 
 
-async def _search_by_artist(query: str, client: httpx.AsyncClient, limit: int) -> list[dict]:
+async def _search_by_artist(
+    query: str,
+    client: httpx.AsyncClient,
+    limit: int,
+    item_types: str,
+    parent_id: str | None,
+) -> list[dict]:
+    # Only Audio/MusicVideo items carry an Artists field — nothing to do if the
+    # requested item types don't include either.
+    artist_types = [t for t in item_types.split(",") if t in ("Audio", "MusicVideo")]
+    if not artist_types:
+        return []
+
     # Step 1: find artist IDs matching the query
-    r = await client.get(f"{JELLYFIN_URL}/Artists", params={
-        "searchTerm": query,
-        "Limit":      10,
-        "api_key":    JELLYFIN_API_KEY,
-    }, timeout=10.0)
+    artist_params = {"searchTerm": query, "Limit": 10, "api_key": JELLYFIN_API_KEY}
+    if parent_id:
+        artist_params["ParentId"] = parent_id
+    r = await client.get(f"{JELLYFIN_URL}/Artists", params=artist_params, timeout=10.0)
     r.raise_for_status()
     artist_ids = [a["Id"] for a in r.json().get("Items", [])]
     if not artist_ids:
         return []
 
-    # Step 2: fetch streamable items by those artist IDs
-    r = await client.get(f"{JELLYFIN_URL}/Items", params={
+    # Step 2: fetch items by those artist IDs, restricted to the requested audio types
+    item_params = {
         "ArtistIds":        ",".join(artist_ids),
         "Recursive":        "true",
-        "IncludeItemTypes": "Audio,MusicVideo",
+        "IncludeItemTypes": ",".join(artist_types),
         "Limit":            limit,
         "Fields":           "RunTimeTicks,ProductionYear,Artists",
         "api_key":          JELLYFIN_API_KEY,
-    }, timeout=10.0)
+    }
+    if parent_id:
+        item_params["ParentId"] = parent_id
+    r = await client.get(f"{JELLYFIN_URL}/Items", params=item_params, timeout=10.0)
     r.raise_for_status()
     return [_parse_item(i) for i in r.json().get("Items", [])]
 
 
-async def search_items(query: str, limit: int = 30) -> list[dict]:
+async def search_items(
+    query: str,
+    limit: int = 30,
+    item_types: list[str] | None = None,
+    library_ids: list[str] | None = None,
+) -> list[dict]:
+    types_param = ",".join(item_types) if item_types else STREAMABLE_TYPES
+    # No libraries selected = search the whole server; otherwise run one
+    # scoped query per selected library (Jellyfin's ParentId filter takes a
+    # single value, not a list).
+    scopes: list[str | None] = library_ids if library_ids else [None]
+
     async with httpx.AsyncClient() as client:
-        title_results, artist_results = await asyncio.gather(
-            _search_by_title(query, client, limit),
-            _search_by_artist(query, client, limit),
-            return_exceptions=True,
-        )
+        tasks = []
+        for parent_id in scopes:
+            tasks.append(_search_by_title(query, client, limit, types_param, parent_id))
+            tasks.append(_search_by_artist(query, client, limit, types_param, parent_id))
+        results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    # Handle partial failures — if one branch errored, treat it as empty
-    title_list  = title_results  if isinstance(title_results,  list) else []
-    artist_list = artist_results if isinstance(artist_results, list) else []
-
-    # Merge and deduplicate by ID; title matches appear first
+    # Merge every scope/branch, logging (not silently swallowing) any failures,
+    # and deduplicate by ID in arrival order — title matches for a given scope
+    # land before that scope's artist matches.
     seen, merged = set(), []
-    for item in title_list + artist_list:
-        if item["id"] not in seen:
-            seen.add(item["id"])
-            merged.append(item)
+    for result in results:
+        if isinstance(result, Exception):
+            logger.warning("Jellyfin search failed for query %r: %s", query, result)
+            continue
+        for item in result:
+            if item["id"] not in seen:
+                seen.add(item["id"])
+                merged.append(item)
     return merged[:limit]
+
+
+async def get_libraries() -> list[dict]:
+    """Return the server's top-level libraries (Movies, TV Shows, Music, etc.)."""
+    async with httpx.AsyncClient() as client:
+        r = await client.get(f"{JELLYFIN_URL}/Library/VirtualFolders", params={
+            "api_key": JELLYFIN_API_KEY,
+        }, timeout=10.0)
+        r.raise_for_status()
+        folders = r.json()
+    return [
+        {"id": f["ItemId"], "name": f["Name"], "collection_type": f.get("CollectionType")}
+        for f in folders
+    ]
 
 
 async def get_item(item_id: str) -> dict | None:

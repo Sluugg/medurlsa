@@ -2,6 +2,7 @@
 Admin API routes — all require a valid Bearer token.
 
 GET    /api/admin/search?q=...        Search Jellyfin library
+GET    /api/admin/libraries           List the server's top-level libraries
 POST   /api/admin/links               Create a new share link
 GET    /api/admin/links               List all share links
 DELETE /api/admin/links/{uuid}        Permanently delete a link + its client records
@@ -13,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from aiosqlite import Connection
 from app.database import get_db
 from app.auth import require_admin
-from app.jellyfin import search_items, get_item
+from app.jellyfin import search_items, get_item, get_libraries
 from app.models import CreateLinkRequest
 from app.config import PUBLIC_BASE_URL
 
@@ -23,12 +24,26 @@ router = APIRouter()
 @router.get("/admin/search")
 async def search_jellyfin(
     q: str,
+    item_types: str | None = None,
+    library_ids: str | None = None,
     _: str = Depends(require_admin),
 ):
-    """Search the Jellyfin library by title."""
+    """Search the Jellyfin library by title. item_types/library_ids are comma-separated."""
     if not q.strip():
         return []
-    return await search_items(q)
+    return await search_items(
+        q,
+        item_types=item_types.split(",") if item_types else None,
+        library_ids=library_ids.split(",") if library_ids else None,
+    )
+
+
+@router.get("/admin/libraries")
+async def list_libraries(
+    _: str = Depends(require_admin),
+):
+    """List the server's top-level libraries, for the library filter checklist."""
+    return await get_libraries()
 
 
 @router.post("/admin/links", status_code=201)

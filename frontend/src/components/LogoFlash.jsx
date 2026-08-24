@@ -30,15 +30,15 @@ export default function LogoFlash({ hasLogo, timing }) {
   const [pos, setPos]         = useState({ top: '5%', left: '5%' })
   const tid = useRef(null)
 
-  const lf = timing?.logo_flash ?? {}
+  const lf = timing.logo_flash
 
   useEffect(() => {
     if (!hasLogo) return
 
     function schedule() {
       const delay = rand(
-        (lf.interval_min_s ?? 20) * 1000,
-        (lf.interval_max_s ?? 60) * 1000,
+        lf.interval_min_s * 1000,
+        lf.interval_max_s * 1000,
       )
       tid.current = setTimeout(() => {
         setPos(randomPos())
@@ -53,7 +53,7 @@ export default function LogoFlash({ hasLogo, timing }) {
             setVisible(false)
             schedule()
           }, FADE_MS)
-        }, lf.duration_ms ?? 3000)
+        }, lf.duration_ms)
       }, delay)
     }
 

@@ -35,12 +35,12 @@ async def get_public_config():
     has_logo  = bool(logo_path and os.path.isfile(str(logo_path)))
 
     return {
-        "site_title":            CONTENT_CONFIG.get("site_title", "dopelink"),
+        "site_title":            CONTENT_CONFIG["site_title"],
         "has_logo":              has_logo,
-        "flavor_texts":          CONTENT_CONFIG.get("flavor_texts", []),
+        "flavor_texts":          CONTENT_CONFIG["flavor_texts"],
         "available_backgrounds": available_backgrounds,
-        "timing":                CONTENT_CONFIG.get("timing", {}),
-        "fonts":                 CONTENT_CONFIG.get("fonts", {}),
+        "timing":                CONTENT_CONFIG["timing"],
+        "fonts":                 CONTENT_CONFIG["fonts"],
     }
 
 
