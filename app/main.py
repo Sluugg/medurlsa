@@ -92,12 +92,16 @@ if os.path.isdir(FRONTEND_DIST):
             # the track/artist info there instead of repeating the site name.
             if link and link["item_artist"]:
                 preview_title = f"{link['item_artist']} - {link['item_title']}"
+                description   = f'Listen to "{link["item_title"]}" by {link["item_artist"]} — shared via {site_title}.'
             elif link:
                 preview_title = link["item_title"]
+                description   = f'Watch "{link["item_title"]}" — shared via {site_title}.'
             else:
                 preview_title = site_title
+                description   = f"Shared via {site_title}."
 
             preview_title = html.escape(preview_title)
+            description   = html.escape(description)
             og_image      = html.escape(f"{PUBLIC_BASE_URL}/api/image/{uuid}")
             og_url        = html.escape(f"{PUBLIC_BASE_URL}/stream/{uuid}")
 
@@ -105,13 +109,16 @@ if os.path.isdir(FRONTEND_DIST):
                 raw_html = f.read()
 
             og = (
+                f'<meta name="description"        content="{description}" />\n'
                 f'<meta property="og:type"        content="website" />\n'
                 f'<meta property="og:site_name"   content="{html.escape(site_title)}" />\n'
                 f'<meta property="og:title"       content="{preview_title}" />\n'
+                f'<meta property="og:description" content="{description}" />\n'
                 f'<meta property="og:image"       content="{og_image}" />\n'
                 f'<meta property="og:url"         content="{og_url}" />\n'
                 f'<meta name="twitter:card"       content="summary_large_image" />\n'
                 f'<meta name="twitter:title"      content="{preview_title}" />\n'
+                f'<meta name="twitter:description" content="{description}" />\n'
                 f'<meta name="twitter:image"      content="{og_image}" />\n'
             )
             raw_html = raw_html.replace("</head>", og + "</head>", 1)
