@@ -88,17 +88,15 @@ if os.path.isdir(FRONTEND_DIST):
                 ) as cur:
                     link = await cur.fetchone()
 
-            # The URL is already shown above the title in link previews, so use
-            # the track/artist info there instead of repeating the site name.
+            # Title stays the site name — the track/artist detail now lives in
+            # the description instead, so it isn't lost, just moved.
+            preview_title = site_title
             if link and link["item_artist"]:
-                preview_title = f"{link['item_artist']} - {link['item_title']}"
-                description   = f'Listen to "{link["item_title"]}" by {link["item_artist"]} — shared via {site_title}.'
+                description = f'Listen to "{link["item_title"]}" by {link["item_artist"]} — shared via {site_title}.'
             elif link:
-                preview_title = link["item_title"]
-                description   = f'Watch "{link["item_title"]}" — shared via {site_title}.'
+                description = f'Watch "{link["item_title"]}" — shared via {site_title}.'
             else:
-                preview_title = site_title
-                description   = f"Shared via {site_title}."
+                description = f"Shared via {site_title}."
 
             preview_title = html.escape(preview_title)
             description   = html.escape(description)
@@ -109,6 +107,10 @@ if os.path.isdir(FRONTEND_DIST):
                 raw_html = f.read()
 
             og = (
+                # Google defaults to a restrictive image preview size unless a
+                # page opts in via this robots directive — unrelated to (and
+                # ignored by) every other platform.
+                f'<meta name="robots"             content="max-image-preview:large" />\n'
                 f'<meta name="description"        content="{description}" />\n'
                 f'<meta property="og:type"        content="website" />\n'
                 f'<meta property="og:site_name"   content="{html.escape(site_title)}" />\n'
