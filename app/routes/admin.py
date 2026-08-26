@@ -9,16 +9,22 @@ DELETE /api/admin/links/{uuid}        Permanently delete a link + its client rec
 PATCH  /api/admin/links/{uuid}/toggle Toggle is_active on/off
 """
 
-import uuid as uuid_lib
+import secrets
 from fastapi import APIRouter, Depends, HTTPException
 from aiosqlite import Connection
 from app.database import get_db
 from app.auth import require_admin
 from app.jellyfin import search_items, get_item, get_libraries
 from app.models import CreateLinkRequest
-from app.config import PUBLIC_BASE_URL
+from app.config import PUBLIC_BASE_URL, LINK_ID_LENGTH
 
 router = APIRouter()
+
+
+def _generate_link_id() -> str:
+    """URL-safe random ID, exactly LINK_ID_LENGTH characters (see app/config.py)."""
+    n_bytes = -(-LINK_ID_LENGTH * 3 // 4)  # ceil(LINK_ID_LENGTH * 3 / 4)
+    return secrets.token_urlsafe(n_bytes)[:LINK_ID_LENGTH]
 
 
 @router.get("/admin/search")
@@ -57,7 +63,15 @@ async def create_link(
     if item is None:
         raise HTTPException(status_code=404, detail="Jellyfin item not found.")
 
-    link_uuid = str(uuid_lib.uuid4())
+    # Collision retry: astronomically unlikely at this entropy, but uuid is
+    # the primary key, so handle it cheaply rather than assume it can't happen.
+    for _attempt in range(5):
+        link_uuid = _generate_link_id()
+        async with db.execute("SELECT 1 FROM share_links WHERE uuid = ?", (link_uuid,)) as cur:
+            if await cur.fetchone() is None:
+                break
+    else:
+        raise HTTPException(status_code=500, detail="Failed to generate a unique link ID.")
 
     await db.execute(
         """INSERT INTO share_links

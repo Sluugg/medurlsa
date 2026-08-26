@@ -24,7 +24,10 @@ _FALLBACK_FAVICON = (
     '</svg>'
 )
 
-_STREAM_UUID_RE = re.compile(r"^stream/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+# Matches both legacy UUIDv4 links (36 chars, hex + dashes) and the shorter
+# token_urlsafe IDs used for new links (LINK_ID_LENGTH chars, base64url — also
+# just alphanumerics/-/_), so old already-shared links keep resolving.
+_STREAM_UUID_RE = re.compile(r"^stream/[A-Za-z0-9_-]{6,40}$")
 
 
 @asynccontextmanager

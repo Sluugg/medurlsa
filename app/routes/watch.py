@@ -10,10 +10,16 @@ POST /api/links/{uuid}/register
 import datetime
 from fastapi import APIRouter, Depends, Request
 from aiosqlite import Connection
+from app.config import RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_SECONDS
 from app.database import get_db
 from app.models import RegisterRequest
+from app.rate_limit import rate_limiter
 
 router = APIRouter()
+
+# Unauthenticated and reachable with any guessed uuid — a prime brute-force
+# target, so it gets its own request budget.
+_register_rate_limit = rate_limiter(RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_SECONDS)
 
 
 def _is_expired(expires_at: str | None) -> bool:
@@ -28,6 +34,7 @@ async def register_watch(
     body: RegisterRequest,
     request: Request,
     db: Connection = Depends(get_db),
+    _rate_limit: None = Depends(_register_rate_limit),
 ):
     # ── 1. Fetch link ──────────────────────────────────────────────────────────
     async with db.execute("SELECT * FROM share_links WHERE uuid = ?", (uuid,)) as cur:

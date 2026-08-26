@@ -20,6 +20,7 @@ from collections import defaultdict
 from fastapi import HTTPException, Request, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from app.config import ADMIN_TOKEN
+from app.rate_limit import client_ip
 
 _bearer = HTTPBearer()
 
@@ -31,14 +32,6 @@ _MAX_FAILURES = 10    # max failures allowed within the window
 _WINDOW_S     = 500   # rolling window and lockout time
 
 _failures: dict[str, list[float]] = defaultdict(list)
-
-
-def _client_ip(request: Request) -> str:
-    """Return the real client IP, honouring X-Forwarded-For from a reverse proxy."""
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
 
 
 def _check_rate_limit(ip: str) -> None:
@@ -89,7 +82,7 @@ def require_admin(
     credentials: HTTPAuthorizationCredentials = Security(_bearer),
 ) -> str:
     """Dependency: requires a valid admin bearer token. Rate-limits failures by IP."""
-    ip = _client_ip(request)
+    ip = client_ip(request)
     _check_rate_limit(ip)
     try:
         result = _verify_token(credentials.credentials)

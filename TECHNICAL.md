@@ -195,6 +195,8 @@ Operational configuration. Contains secrets and environment-specific values that
 | `PUBLIC_BASE_URL` | Public-facing URL of this app (used in generated share links) |
 | `DB_PATH` | Path to the SQLite database file |
 | `BACKGROUNDS_DIR` | Directory containing background image/video files |
+| `LINK_ID_LENGTH` | Character length of newly generated share link IDs (8–16, default 12). Existing links are unaffected — this only governs newly created ones |
+| `RATE_LIMIT_MAX_REQUESTS` / `RATE_LIMIT_WINDOW_SECONDS` | Per-IP request budget applied to the public register and cover-art endpoints, which are otherwise unauthenticated brute-force targets for guessing link IDs |
 
 ### `content_config.json`
 
@@ -267,7 +269,7 @@ This approach was chosen over IP-based fingerprinting because:
 
 The tradeoff is that clearing localStorage or using private browsing generates a new client ID, which consumes an additional slot against `max_clients`. This is considered a known and acceptable limitation rather than a security bypass — it results in faster exhaustion of the client limit, not circumvention of it.
 
-The client ID is stored server-side in `link_clients`. It is not a secret — it is only used for access tracking, not authentication. The security boundary is the link UUID itself, which is a cryptographically random v4 UUID.
+The client ID is stored server-side in `link_clients`. It is not a secret — it is only used for access tracking, not authentication. The security boundary is the link ID itself: a CSPRNG-generated (`secrets.token_urlsafe`), URL-safe random string, `LINK_ID_LENGTH` characters long (8–16, default 12) — see `app/routes/admin.py`. Older links generated before this change remain full 36-character UUIDv4 strings; both formats resolve identically since `uuid` is a plain `TEXT` primary key with no length constraint. Because this ID is the sole access control, the public endpoints that don't otherwise require a registered client (`/api/links/{uuid}/register`, `/api/image/{uuid}`) are rate-limited per IP (`RATE_LIMIT_MAX_REQUESTS`/`RATE_LIMIT_WINDOW_SECONDS`, see `app/rate_limit.py`) to slow brute-force guessing.
 
 ---
 

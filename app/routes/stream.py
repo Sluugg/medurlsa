@@ -20,12 +20,17 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from aiosqlite import Connection
-from app.config import JELLYFIN_URL, JELLYFIN_API_KEY
+from app.config import JELLYFIN_URL, JELLYFIN_API_KEY, RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_SECONDS
 from app.content_config import CONTENT_CONFIG
 from app.database import get_db
 from app.jellyfin import build_stream_url
+from app.rate_limit import rate_limiter
 
 router = APIRouter()
+
+# /image needs no client registration at all — the cheapest possible
+# brute-force target — so it gets its own request budget.
+_image_rate_limit = rate_limiter(RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_SECONDS)
 
 
 def _logo_fallback():
@@ -133,7 +138,11 @@ async def stream_media(
 
 
 @router.get("/image/{uuid}")
-async def get_cover_art(uuid: str, db: Connection = Depends(get_db)):
+async def get_cover_art(
+    uuid: str,
+    db: Connection = Depends(get_db),
+    _rate_limit: None = Depends(_image_rate_limit),
+):
     # ── 1. Validate link exists and is active ─────────────────────────────────
     async with db.execute("SELECT * FROM share_links WHERE uuid = ?", (uuid,)) as cur:
         row = await cur.fetchone()
