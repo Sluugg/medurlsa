@@ -71,7 +71,9 @@ export default function WatchPage() {
 
   // Flavor text: link-level override wraps in array, else use global pool
   const flavorTexts    = media?.flavor_text ? [media.flavor_text] : config.flavor_texts
-  const flavorEnabled  = media?.flavor_enabled ?? false
+  // The deployment-wide switch is a hard override — per-link flavor_enabled
+  // only has effect when the deployment has the flavor system on at all.
+  const flavorEnabled  = config.animations_enabled && (media?.flavor_enabled ?? false)
 
   // ── Loading ────────────────────────────────────────────────────────────────
   if (phase === 'loading') {
@@ -121,7 +123,12 @@ export default function WatchPage() {
           }}
         >
           {/* Title banner with glitch + color cycle */}
-          <TitleBanner siteTitle={config.site_title} timing={config.timing} fonts={config.fonts} />
+          <TitleBanner
+            siteTitle={config.site_title}
+            timing={config.timing}
+            fonts={config.fonts}
+            animationsEnabled={config.animations_enabled}
+          />
 
           {/* Media title */}
           <div className="space-y-0.5">

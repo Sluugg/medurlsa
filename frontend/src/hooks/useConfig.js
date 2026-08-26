@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 const DEFAULT_CONFIG = {
   site_title:            'dopelink',
   has_logo:              false,
+  animations_enabled:    false,
   flavor_texts:          [],
   available_backgrounds: [],
   timing: {

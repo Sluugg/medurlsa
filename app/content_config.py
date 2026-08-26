@@ -12,6 +12,12 @@ _CONFIG_PATH  = os.path.join(_PROJECT_ROOT, "content_config.json")
 _DEFAULTS: dict = {
     "site_title": "dopelink",
     "logo_path":  None,
+    # Deployment-wide master switch for the whole visual flavor system
+    # (title glitch/jitter/color-cycle, background, floating flavor text,
+    # logo overlay). Distinct from the per-link `flavor_enabled` DB column,
+    # which only has effect when this is true. Defaults to off so a fresh
+    # clone with no content_config.json renders a plain watch page.
+    "animations_enabled": False,
     "flavor_texts": [],
     "fonts": {
         "title": {

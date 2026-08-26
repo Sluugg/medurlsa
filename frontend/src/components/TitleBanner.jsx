@@ -16,7 +16,7 @@ function rand(min, max) {
   return min + Math.random() * (max - min)
 }
 
-export default function TitleBanner({ siteTitle, timing, fonts }) {
+export default function TitleBanner({ siteTitle, timing, fonts, animationsEnabled }) {
   const [glitching,   setGlitching]   = useState(false)
   const [isCycling,   setIsCycling]   = useState(false)
   const [jitterPhase, setJitterPhase] = useState(0)
@@ -29,6 +29,7 @@ export default function TitleBanner({ siteTitle, timing, fonts }) {
 
   // ── Glitch loop ─────────────────────────────────────────────────────────────
   useEffect(() => {
+    if (!animationsEnabled) return
     let tid
     function schedule() {
       const delay = rand(
@@ -45,11 +46,12 @@ export default function TitleBanner({ siteTitle, timing, fonts }) {
     }
     schedule()
     return () => clearTimeout(tid)
-  }, [gt.interval_min_s, gt.interval_max_s, gt.duration_ms])
+  }, [animationsEnabled, gt.interval_min_s, gt.interval_max_s, gt.duration_ms])
 
   // ── Color cycle loop ─────────────────────────────────────────────────────────
   // Uses CSS colorCycle animation for smooth gradated shifts — no JS color stepping.
   useEffect(() => {
+    if (!animationsEnabled) return
     let tid
     function schedule() {
       const delay = rand(
@@ -66,7 +68,7 @@ export default function TitleBanner({ siteTitle, timing, fonts }) {
     }
     schedule()
     return () => clearTimeout(tid)
-  }, [ct.interval_min_s, ct.interval_max_s, ct.duration_ms])
+  }, [animationsEnabled, ct.interval_min_s, ct.interval_max_s, ct.duration_ms])
 
   const glitchDuration    = gt.duration_ms
   const cycleDuration     = ct.duration_ms
@@ -77,27 +79,34 @@ export default function TitleBanner({ siteTitle, timing, fonts }) {
 
   // ── Jitter loop ──────────────────────────────────────────────────────────────
   useEffect(() => {
+    if (!animationsEnabled) return
     const iid = setInterval(
       () => setJitterPhase(p => 1 - p),
       jitterDelayMs,
     )
     return () => clearInterval(iid)
-  }, [jitterDelayMs])
+  }, [animationsEnabled, jitterDelayMs])
 
   // Build animation string: glitch and cycle are independent — both can be active.
-  const animations = [
-    glitching ? `vhsGlitch ${glitchDuration}ms steps(1) forwards` : null,
-    isCycling ? `colorCycle ${cycleDuration}ms linear forwards`    : null,
-  ].filter(Boolean).join(', ') || 'none'
+  const animations = animationsEnabled
+    ? [
+        glitching ? `vhsGlitch ${glitchDuration}ms steps(1) forwards` : null,
+        isCycling ? `colorCycle ${cycleDuration}ms linear forwards`    : null,
+      ].filter(Boolean).join(', ') || 'none'
+    : 'none'
 
   return (
     <div className="w-full flex justify-center">
       <div
-        className="pearl-border inline-block rounded px-4 py-2"
-        style={{
-          backgroundColor:       'rgba(5, 2, 18, 0.85)',
+        className={animationsEnabled
+          ? 'pearl-border inline-block rounded px-4 py-2'
+          : 'inline-block rounded px-4 py-2 border border-gray-700'}
+        style={animationsEnabled ? {
+          backgroundColor:        'rgba(5, 2, 18, 0.85)',
           '--pearl-border-width': `${pearlBorderWidth}px`,
           '--pearl-cycle-rate':   `${pearlCycleRate}s`,
+        } : {
+          backgroundColor: 'rgba(5, 2, 18, 0.85)',
         }}
       >
         <div
@@ -107,7 +116,7 @@ export default function TitleBanner({ siteTitle, timing, fonts }) {
             fontWeight:    tf.weight,
             letterSpacing: '0.15em',
             userSelect:    'none',
-            color:         isCycling ? undefined : '#ffffff',
+            color:         (animationsEnabled && isCycling) ? undefined : '#ffffff',
             animation:     animations,
           }}
         >
@@ -116,9 +125,9 @@ export default function TitleBanner({ siteTitle, timing, fonts }) {
               key={i}
               style={{
                 display:   'inline-block',
-                transform: char === ' '
-                  ? undefined
-                  : `translateY(${jitterPhase * jitterDistPx * (i % 2 === 0 ? -1 : 1)}px)`,
+                transform: (animationsEnabled && char !== ' ')
+                  ? `translateY(${jitterPhase * jitterDistPx * (i % 2 === 0 ? -1 : 1)}px)`
+                  : undefined,
               }}
             >
               {char === ' ' ? '\u00A0' : char}

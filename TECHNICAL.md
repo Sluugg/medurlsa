@@ -204,6 +204,7 @@ Editorial and presentation configuration. Controls what viewers see and how visu
 |---|---|
 | `site_title` | Text displayed in the title banner on the watch page |
 | `logo_path` | Path to a logo image file for the LogoFlash overlay |
+| `animations_enabled` | Deployment-wide master switch for the whole visual flavor system (title glitch/jitter/color-cycle, background, floating flavor text, logo overlay). Defaults to `false` so a fresh clone with no `content_config.json` renders a plain watch page — distinct from the per-link `flavor_enabled` DB column, which only has effect when this is `true` |
 | `flavor_texts` | Pool of strings that float across the screen during playback |
 | `timing.glitch` | Interval range and duration for the VHS glitch effect on the title |
 | `timing.color_cycle` | Interval range, duration, and step rate for synthwave color cycling |
