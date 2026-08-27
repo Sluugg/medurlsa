@@ -38,6 +38,7 @@ async def get_public_config():
         "site_title":            CONTENT_CONFIG["site_title"],
         "has_logo":              has_logo,
         "animations_enabled":    CONTENT_CONFIG["animations_enabled"],
+        "flavor_texts_enabled":  CONTENT_CONFIG["flavor_texts_enabled"],
         "flavor_texts":          CONTENT_CONFIG["flavor_texts"],
         "available_backgrounds": available_backgrounds,
         "timing":                CONTENT_CONFIG["timing"],

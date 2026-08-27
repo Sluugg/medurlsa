@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import DB_PATH
 from app.database import init_db
-from app.routes import admin, hls, stream, watch
+from app.routes import admin, hls, settings, stream, watch
 from app.routes import public_config as public_config_router
 
 FRONTEND_DIST = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
@@ -51,6 +51,7 @@ app.include_router(watch.router,               prefix="/api")
 app.include_router(stream.router,              prefix="/api")
 app.include_router(hls.router,                 prefix="/api")
 app.include_router(admin.router,               prefix="/api")
+app.include_router(settings.router,            prefix="/api")
 app.include_router(public_config_router.router, prefix="/api")
 
 # ── Favicon ───────────────────────────────────────────────────────────────────

@@ -422,6 +422,222 @@ function CreateLinkModal({ item, token, availableBackgrounds, onCreated, onClose
   )
 }
 
+// ── SettingsModal ─────────────────────────────────────────────────────────────
+// Views/edits the same values that live in .env and content_config.json.
+// .env fields require a server restart to take effect; content_config.json
+// fields apply immediately (the backend reloads it right after writing).
+
+function SettingsModal({ token, onClose }) {
+  const [envValues, setEnvValues]         = useState(null)
+  const [contentValues, setContentValues] = useState(null)
+  const [flavorTextsRaw, setFlavorTextsRaw] = useState('')
+  const [loading, setLoading]   = useState(true)
+  const [saving, setSaving]     = useState(false)
+  const [error, setError]       = useState('')
+  const [savedMsg, setSavedMsg] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      let r
+      try {
+        r = await fetch('/api/admin/settings', { headers: authHeaders(token) })
+      } catch {
+        if (!cancelled) { setError(UNREACHABLE_MSG); setLoading(false) }
+        return
+      }
+      if (!r.ok) {
+        if (!cancelled) { setError(await apiErrorMessage(r)); setLoading(false) }
+        return
+      }
+      const data = await r.json()
+      if (!cancelled) {
+        setEnvValues(data.env)
+        setContentValues(data.content_config)
+        setFlavorTextsRaw(data.content_config.flavor_texts.join('\n'))
+        setLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [token])
+
+  function updateEnv(key, value) {
+    setEnvValues(prev => ({ ...prev, [key]: value }))
+  }
+  function updateContent(key, value) {
+    setContentValues(prev => ({ ...prev, [key]: value }))
+  }
+
+  async function handleSave(e) {
+    e.preventDefault()
+    setSaving(true)
+    setError('')
+    setSavedMsg('')
+    const body = {
+      env: {
+        ...envValues,
+        LINK_ID_LENGTH:            parseInt(envValues.LINK_ID_LENGTH),
+        RATE_LIMIT_MAX_REQUESTS:   parseInt(envValues.RATE_LIMIT_MAX_REQUESTS),
+        RATE_LIMIT_WINDOW_SECONDS: parseInt(envValues.RATE_LIMIT_WINDOW_SECONDS),
+      },
+      content_config: {
+        ...contentValues,
+        flavor_texts: flavorTextsRaw.split('\n').map(s => s.trim()).filter(Boolean),
+      },
+    }
+    let r
+    try {
+      r = await fetch('/api/admin/settings', {
+        method:  'PUT',
+        headers: authHeaders(token),
+        body:    JSON.stringify(body),
+      })
+    } catch {
+      setSaving(false)
+      setError(UNREACHABLE_MSG)
+      return
+    }
+    setSaving(false)
+    if (r.ok) {
+      const result = await r.json()
+      setSavedMsg(
+        result.restart_required
+          ? 'Saved. Restart the server for the .env changes to take effect.'
+          : 'Saved.'
+      )
+    } else {
+      setError(await apiErrorMessage(r))
+    }
+  }
+
+  const inputCls = 'w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500'
+  const labelCls = 'block text-xs text-gray-400 mb-1'
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4 overflow-y-auto py-4" onClick={onClose}>
+      <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-lg space-y-4 my-auto" onClick={e => e.stopPropagation()}>
+        <h2 className="text-lg font-bold text-white">Settings</h2>
+
+        {loading && <p className="text-gray-500 text-sm">Loading…</p>}
+        {!loading && error && !envValues && <p className="text-red-400 text-sm">{error}</p>}
+
+        {envValues && contentValues && (
+          <form onSubmit={handleSave} className="space-y-5">
+
+            {/* .env — restart required */}
+            <div className="space-y-3">
+              <p className="text-xs text-yellow-400 uppercase tracking-wide font-semibold">
+                These settings will require an app restart
+              </p>
+
+              <div>
+                <label className={labelCls}>Jellyfin URL</label>
+                <input type="text" value={envValues.JELLYFIN_URL}
+                  onChange={e => updateEnv('JELLYFIN_URL', e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Jellyfin API key</label>
+                <input type="password" value={envValues.JELLYFIN_API_KEY}
+                  onChange={e => updateEnv('JELLYFIN_API_KEY', e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Admin token</label>
+                <input type="password" value={envValues.ADMIN_TOKEN}
+                  onChange={e => updateEnv('ADMIN_TOKEN', e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Public base URL</label>
+                <input type="text" value={envValues.PUBLIC_BASE_URL}
+                  onChange={e => updateEnv('PUBLIC_BASE_URL', e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Database path</label>
+                <input type="text" value={envValues.DB_PATH}
+                  onChange={e => updateEnv('DB_PATH', e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Backgrounds directory</label>
+                <input type="text" value={envValues.BACKGROUNDS_DIR}
+                  onChange={e => updateEnv('BACKGROUNDS_DIR', e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Link ID length (8–16)</label>
+                <input type="number" min="8" max="16" value={envValues.LINK_ID_LENGTH}
+                  onChange={e => updateEnv('LINK_ID_LENGTH', e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Rate limit — max requests</label>
+                <input type="number" min="1" value={envValues.RATE_LIMIT_MAX_REQUESTS}
+                  onChange={e => updateEnv('RATE_LIMIT_MAX_REQUESTS', e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Rate limit — window (seconds)</label>
+                <input type="number" min="1" value={envValues.RATE_LIMIT_WINDOW_SECONDS}
+                  onChange={e => updateEnv('RATE_LIMIT_WINDOW_SECONDS', e.target.value)} className={inputCls} />
+              </div>
+            </div>
+
+            {/* content_config.json — applies immediately */}
+            <div className="border-t border-gray-700 pt-4 space-y-3">
+              <p className="text-xs text-green-400 uppercase tracking-wide font-semibold">
+                These settings apply immediately
+              </p>
+
+              <div>
+                <label className={labelCls}>Site title</label>
+                <input type="text" value={contentValues.site_title}
+                  onChange={e => updateContent('site_title', e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Logo path</label>
+                <input type="text" value={contentValues.logo_path ?? ''}
+                  onChange={e => updateContent('logo_path', e.target.value)} className={inputCls} />
+              </div>
+              <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={contentValues.animations_enabled}
+                  onChange={e => updateContent('animations_enabled', e.target.checked)}
+                  className="rounded accent-purple-500"
+                />
+                Enable visual flavor system (title glitch, background, logo, flavor text)
+              </label>
+              <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={contentValues.flavor_texts_enabled}
+                  onChange={e => updateContent('flavor_texts_enabled', e.target.checked)}
+                  className="rounded accent-purple-500"
+                />
+                Enable floating flavor text
+              </label>
+              <div>
+                <label className={labelCls}>Flavor text pool (one per line)</label>
+                <textarea
+                  rows={4}
+                  value={flavorTextsRaw}
+                  onChange={e => setFlavorTextsRaw(e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+            </div>
+
+            {error && <p className="text-red-400 text-sm">{error}</p>}
+            {savedMsg && <p className="text-green-400 text-sm">{savedMsg}</p>}
+
+            <div className="flex gap-2 pt-1">
+              <button type="button" onClick={onClose} className="flex-1 bg-gray-700 hover:bg-gray-600 rounded py-2 text-white text-sm">Close</button>
+              <button type="submit" disabled={saving} className="flex-1 bg-blue-600 hover:bg-blue-700 rounded py-2 text-white text-sm font-medium disabled:opacity-50">
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── main admin page ───────────────────────────────────────────────────────────
 
 export default function AdminPage() {
@@ -434,6 +650,7 @@ export default function AdminPage() {
   const [libraries, setLibraries]   = useState([])
   const [selectedTypes, setSelectedTypes]         = useState(() => new Set(MEDIA_TYPES.map(t => t.value)))
   const [selectedLibraries, setSelectedLibraries] = useState(() => new Set())
+  const [showSettings, setShowSettings] = useState(false)
   const searchTimer                 = useRef(null)
   const { config }                  = useConfig()
 
@@ -527,8 +744,22 @@ export default function AdminPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white">Share Admin</h1>
-        <button onClick={handleLogout} className="text-sm text-gray-400 hover:text-white">Sign out</button>
+        <div className="flex items-center gap-4">
+          <button onClick={handleLogout} className="text-sm text-gray-400 hover:text-white">Sign out</button>
+          <button
+            onClick={() => setShowSettings(true)}
+            className="text-gray-400 hover:text-white text-lg leading-none"
+            title="Settings"
+            aria-label="Settings"
+          >
+            ⚙
+          </button>
+        </div>
       </div>
+
+      {showSettings && (
+        <SettingsModal token={token} onClose={() => setShowSettings(false)} />
+      )}
 
       {/* Search Jellyfin */}
       <section className="bg-gray-900 border border-gray-700 rounded-xl p-5 space-y-4">

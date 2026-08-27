@@ -73,7 +73,10 @@ export default function WatchPage() {
   const flavorTexts    = media?.flavor_text ? [media.flavor_text] : config.flavor_texts
   // The deployment-wide switch is a hard override — per-link flavor_enabled
   // only has effect when the deployment has the flavor system on at all.
-  const flavorEnabled  = config.animations_enabled && (media?.flavor_enabled ?? false)
+  const flavorEnabled     = config.animations_enabled && (media?.flavor_enabled ?? false)
+  // Independent finer-grained switch: floating flavor text specifically can
+  // be turned off while background/logo/title effects stay on.
+  const flavorTextEnabled = flavorEnabled && config.flavor_texts_enabled
 
   // ── Loading ────────────────────────────────────────────────────────────────
   if (phase === 'loading') {
@@ -167,11 +170,11 @@ export default function WatchPage() {
       </div>
 
       {/* z-20 — floating flavor overlays (flavor_enabled only) */}
+      {flavorTextEnabled && (
+        <FlavorText texts={flavorTexts} timing={config.timing} fonts={config.fonts} />
+      )}
       {flavorEnabled && (
-        <>
-          <FlavorText texts={flavorTexts}     timing={config.timing} fonts={config.fonts} />
-          <LogoFlash  hasLogo={config.has_logo} timing={config.timing} />
-        </>
+        <LogoFlash hasLogo={config.has_logo} timing={config.timing} />
       )}
     </div>
   )

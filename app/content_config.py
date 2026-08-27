@@ -1,6 +1,10 @@
 """
-Loads content_config.json from the project root and merges it over hardcoded defaults.
-Read once at import time — server restart required for changes to take effect.
+Loads content_config.json from the project root and merges it over hardcoded
+defaults. Read at import time and again whenever reload_content_config() runs
+(the admin settings page calls this right after writing the file, via
+save_content_config() — see app/routes/settings.py) — no restart required for
+changes made that way. A manual edit of the file on disk still needs either a
+restart or a save from the settings page to be picked up.
 """
 
 import json
@@ -18,6 +22,11 @@ _DEFAULTS: dict = {
     # which only has effect when this is true. Defaults to off so a fresh
     # clone with no content_config.json renders a plain watch page.
     "animations_enabled": False,
+    # Independent of animations_enabled — lets the floating flavor-text
+    # feature specifically be turned off while background/logo/title effects
+    # stay on. Has no effect if animations_enabled (or the per-link
+    # flavor_enabled) is already off.
+    "flavor_texts_enabled": True,
     "flavor_texts": [],
     "fonts": {
         "title": {
@@ -84,3 +93,35 @@ def _load() -> dict:
 
 
 CONTENT_CONFIG: dict = _load()
+
+
+def reload_content_config() -> None:
+    """
+    Re-read content_config.json from disk. Mutates CONTENT_CONFIG in place
+    (clear + update, not reassignment) so every module that already did
+    `from app.content_config import CONTENT_CONFIG` sees the change — that
+    import binds to this dict object, not a copy of its current contents.
+    """
+    CONTENT_CONFIG.clear()
+    CONTENT_CONFIG.update(_load())
+
+
+def save_content_config(updates: dict) -> None:
+    """
+    Shallow-merge `updates` onto whatever's currently on disk (creating the
+    file from defaults if it doesn't exist yet), write it back, and reload
+    CONTENT_CONFIG so the change applies immediately. Only touches the
+    top-level keys present in `updates` — any custom timing/font overrides
+    already in the file that aren't managed by the settings page are left
+    untouched.
+    """
+    if os.path.exists(_CONFIG_PATH):
+        with open(_CONFIG_PATH, "r", encoding="utf-8") as f:
+            current = json.load(f)
+    else:
+        current = {}
+    current.update(updates)
+    with open(_CONFIG_PATH, "w", encoding="utf-8") as f:
+        json.dump(current, f, indent=2)
+        f.write("\n")
+    reload_content_config()

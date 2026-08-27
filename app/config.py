@@ -9,6 +9,11 @@ ADMIN_TOKEN: str = os.getenv("ADMIN_TOKEN", "")
 PUBLIC_BASE_URL: str = os.getenv("PUBLIC_BASE_URL", "http://localhost:8000").rstrip("/")
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+# Path to the .env file itself, for the admin settings page to write updates
+# back to (app/routes/settings.py). Changes there require a process restart
+# to take effect — see that module's docstring for why.
+ENV_PATH = os.path.join(_PROJECT_ROOT, ".env")
+
 DB_PATH: str = os.getenv(
     "DB_PATH",
     os.path.join(_PROJECT_ROOT, "data", "links.db"),
@@ -23,14 +28,14 @@ BACKGROUNDS_DIR: str = os.getenv(
 # already are. Bounded to keep IDs resistant to brute-force guessing against
 # the public endpoints (paired with rate limiting below) without going longer
 # than necessary.
-_LINK_ID_LENGTH_MIN = 8
-_LINK_ID_LENGTH_MAX = 16
+LINK_ID_LENGTH_MIN = 8
+LINK_ID_LENGTH_MAX = 16
 LINK_ID_LENGTH: int = int(os.getenv("LINK_ID_LENGTH", "12"))
-if not (_LINK_ID_LENGTH_MIN <= LINK_ID_LENGTH <= _LINK_ID_LENGTH_MAX):
+if not (LINK_ID_LENGTH_MIN <= LINK_ID_LENGTH <= LINK_ID_LENGTH_MAX):
     raise ValueError(
-        f"LINK_ID_LENGTH must be between {_LINK_ID_LENGTH_MIN} and {_LINK_ID_LENGTH_MAX} "
+        f"LINK_ID_LENGTH must be between {LINK_ID_LENGTH_MIN} and {LINK_ID_LENGTH_MAX} "
         f"(got {LINK_ID_LENGTH}). Shorter IDs are brute-forceable against the public "
-        f"endpoints; there's no real benefit to going higher than {_LINK_ID_LENGTH_MAX}."
+        f"endpoints; there's no real benefit to going higher than {LINK_ID_LENGTH_MAX}."
     )
 
 # Basic per-IP rate limiting for the public, unauthenticated endpoints that
