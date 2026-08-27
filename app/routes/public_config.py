@@ -37,8 +37,10 @@ async def get_public_config():
     return {
         "site_title":            CONTENT_CONFIG["site_title"],
         "has_logo":              has_logo,
-        "animations_enabled":    CONTENT_CONFIG["animations_enabled"],
-        "flavor_texts_enabled":  CONTENT_CONFIG["flavor_texts_enabled"],
+        "glitch_enabled":        CONTENT_CONFIG["glitch_enabled"],
+        "background_enabled":    CONTENT_CONFIG["background_enabled"],
+        "logo_flash_enabled":    CONTENT_CONFIG["logo_flash_enabled"],
+        "flavor_text_enabled":   CONTENT_CONFIG["flavor_text_enabled"],
         "flavor_texts":          CONTENT_CONFIG["flavor_texts"],
         "available_backgrounds": available_backgrounds,
         "timing":                CONTENT_CONFIG["timing"],

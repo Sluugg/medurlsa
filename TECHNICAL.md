@@ -206,8 +206,10 @@ Editorial and presentation configuration. Controls what viewers see and how visu
 |---|---|
 | `site_title` | Text displayed in the title banner on the watch page |
 | `logo_path` | Path to a logo image file for the LogoFlash overlay |
-| `animations_enabled` | Deployment-wide master switch for the whole visual flavor system (title glitch/jitter/color-cycle, background, floating flavor text, logo overlay). Defaults to `false` so a fresh clone with no `content_config.json` renders a plain watch page — distinct from the per-link `flavor_enabled` DB column, which only has effect when this is `true` |
-| `flavor_texts_enabled` | Independent of `animations_enabled` — turns the floating flavor-text feature off specifically while background/logo/title effects stay on. Has no effect if `animations_enabled` (or the per-link `flavor_enabled`) is already off |
+| `glitch_enabled` | Deployment-wide switch for the title glitch/jitter/color-cycle + pearl border effects. Defaults to `false` so a fresh clone with no `content_config.json` renders a plain watch page. Not gated by the per-link `flavor_enabled` DB column — only the deployment-wide switch matters here |
+| `background_enabled` | Deployment-wide switch for the fullscreen background. Independent of the other three switches; combined with the per-link `flavor_enabled` DB column (both must be true) |
+| `logo_flash_enabled` | Deployment-wide switch for the logo overlay. Same combination rule as `background_enabled` |
+| `flavor_text_enabled` | Deployment-wide switch for the floating flavor-text feature. Same combination rule as `background_enabled` |
 | `flavor_texts` | Pool of strings that float across the screen during playback |
 | `timing.glitch` | Interval range and duration for the VHS glitch effect on the title |
 | `timing.color_cycle` | Interval range, duration, and step rate for synthwave color cycling |

@@ -70,13 +70,15 @@ export default function WatchPage() {
   }, [media, config])
 
   // Flavor text: link-level override wraps in array, else use global pool
-  const flavorTexts    = media?.flavor_text ? [media.flavor_text] : config.flavor_texts
-  // The deployment-wide switch is a hard override — per-link flavor_enabled
-  // only has effect when the deployment has the flavor system on at all.
-  const flavorEnabled     = config.animations_enabled && (media?.flavor_enabled ?? false)
-  // Independent finer-grained switch: floating flavor text specifically can
-  // be turned off while background/logo/title effects stay on.
-  const flavorTextEnabled = flavorEnabled && config.flavor_texts_enabled
+  const flavorTexts = media?.flavor_text ? [media.flavor_text] : config.flavor_texts
+  // Each deployment-wide switch is independent (background can be on while
+  // glitch is off, etc.) — the per-link flavor_enabled DB column is a hard
+  // per-link override on top, same as before. Glitch/title effects aren't
+  // gated by the per-link flag — that's existing behavior, unchanged here.
+  const linkFlavorEnabled = media?.flavor_enabled ?? false
+  const backgroundEnabled = config.background_enabled  && linkFlavorEnabled
+  const logoFlashEnabled  = config.logo_flash_enabled  && linkFlavorEnabled
+  const flavorTextEnabled = config.flavor_text_enabled && linkFlavorEnabled
 
   // ── Loading ────────────────────────────────────────────────────────────────
   if (phase === 'loading') {
@@ -113,7 +115,7 @@ export default function WatchPage() {
     <div className="min-h-screen relative">
 
       {/* z-0 — fullscreen background */}
-      {flavorEnabled && <Background filename={bgFile} />}
+      {backgroundEnabled && <Background filename={bgFile} />}
 
       {/* z-10 — content card */}
       <div className="relative z-10 flex flex-col items-center justify-start px-4 py-8 min-h-screen">
@@ -130,7 +132,7 @@ export default function WatchPage() {
             siteTitle={config.site_title}
             timing={config.timing}
             fonts={config.fonts}
-            animationsEnabled={config.animations_enabled}
+            animationsEnabled={config.glitch_enabled}
           />
 
           {/* Media title */}
@@ -169,11 +171,11 @@ export default function WatchPage() {
         </div>
       </div>
 
-      {/* z-20 — floating flavor overlays (flavor_enabled only) */}
+      {/* z-20 — floating flavor overlays */}
       {flavorTextEnabled && (
         <FlavorText texts={flavorTexts} timing={config.timing} fonts={config.fonts} />
       )}
-      {flavorEnabled && (
+      {logoFlashEnabled && (
         <LogoFlash hasLogo={config.has_logo} timing={config.timing} />
       )}
     </div>

@@ -1,7 +1,10 @@
 {
   "site_title": "dopelink",
   "logo_path": "/path/to/your/logo.png",
-  "animations_enabled": true,
+  "glitch_enabled": true,
+  "background_enabled": true,
+  "logo_flash_enabled": true,
+  "flavor_text_enabled": true,
   "flavor_texts": [
     "rewinding...",
     "tracking...",

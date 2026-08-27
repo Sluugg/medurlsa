@@ -542,7 +542,7 @@ function SettingsModal({ token, onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4 overflow-y-auto py-4" onClick={onClose}>
-      <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-lg space-y-4 my-auto" onClick={e => e.stopPropagation()}>
+      <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-3xl space-y-4 my-auto" onClick={e => e.stopPropagation()}>
         <h2 className="text-lg font-bold text-white">Settings</h2>
 
         {loading && <p className="text-gray-500 text-sm">Loading…</p>}
@@ -551,106 +551,134 @@ function SettingsModal({ token, onClose }) {
         {envValues && contentValues && (
           <form onSubmit={handleSave} className="space-y-5">
 
-            {/* .env — restart required */}
-            <div className="space-y-3">
-              <p className="text-xs text-yellow-400 uppercase tracking-wide font-semibold">
-                These settings will require an app restart
-              </p>
-              {envPending.length > 0 && (
-                <p className="text-xs text-yellow-400">
-                  * — saved, will apply after the next restart
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5">
+
+              {/* .env — restart required */}
+              <div className="space-y-3">
+                <p className="text-xs text-yellow-400 uppercase tracking-wide font-semibold">
+                  These settings will require an app restart
                 </p>
-              )}
+                {envPending.length > 0 && (
+                  <p className="text-xs text-yellow-400">
+                    * — saved, will apply after the next restart
+                  </p>
+                )}
 
-              <div>
-                {fieldLabel('Jellyfin URL', 'JELLYFIN_URL')}
-                <input type="text" value={envValues.JELLYFIN_URL}
-                  onChange={e => updateEnv('JELLYFIN_URL', e.target.value)} className={inputCls} />
+                <div>
+                  {fieldLabel('Jellyfin URL', 'JELLYFIN_URL')}
+                  <input type="text" value={envValues.JELLYFIN_URL}
+                    onChange={e => updateEnv('JELLYFIN_URL', e.target.value)} className={inputCls} />
+                </div>
+                <div>
+                  {fieldLabel('Jellyfin API key', 'JELLYFIN_API_KEY')}
+                  <input type="password" value={envValues.JELLYFIN_API_KEY}
+                    onChange={e => updateEnv('JELLYFIN_API_KEY', e.target.value)} className={inputCls} />
+                </div>
+                <div>
+                  {fieldLabel('Admin token', 'ADMIN_TOKEN')}
+                  <input type="password" value={envValues.ADMIN_TOKEN}
+                    onChange={e => updateEnv('ADMIN_TOKEN', e.target.value)} className={inputCls} />
+                </div>
+                <div>
+                  {fieldLabel('Public base URL', 'PUBLIC_BASE_URL')}
+                  <input type="text" value={envValues.PUBLIC_BASE_URL}
+                    onChange={e => updateEnv('PUBLIC_BASE_URL', e.target.value)} className={inputCls} />
+                </div>
+                <div>
+                  {fieldLabel('Database path', 'DB_PATH')}
+                  <input type="text" value={envValues.DB_PATH}
+                    onChange={e => updateEnv('DB_PATH', e.target.value)} className={inputCls} />
+                </div>
+                <div>
+                  {fieldLabel('Backgrounds directory', 'BACKGROUNDS_DIR')}
+                  <input type="text" value={envValues.BACKGROUNDS_DIR}
+                    onChange={e => updateEnv('BACKGROUNDS_DIR', e.target.value)} className={inputCls} />
+                </div>
+                <div>
+                  {fieldLabel('Link ID length (8–16)', 'LINK_ID_LENGTH')}
+                  <input type="number" min="8" max="16" value={envValues.LINK_ID_LENGTH}
+                    onChange={e => updateEnv('LINK_ID_LENGTH', e.target.value)} className={inputCls} />
+                </div>
+                <div>
+                  {fieldLabel('Rate limit — max requests', 'RATE_LIMIT_MAX_REQUESTS')}
+                  <input type="number" min="1" value={envValues.RATE_LIMIT_MAX_REQUESTS}
+                    onChange={e => updateEnv('RATE_LIMIT_MAX_REQUESTS', e.target.value)} className={inputCls} />
+                </div>
+                <div>
+                  {fieldLabel('Rate limit — window (seconds)', 'RATE_LIMIT_WINDOW_SECONDS')}
+                  <input type="number" min="1" value={envValues.RATE_LIMIT_WINDOW_SECONDS}
+                    onChange={e => updateEnv('RATE_LIMIT_WINDOW_SECONDS', e.target.value)} className={inputCls} />
+                </div>
               </div>
-              <div>
-                {fieldLabel('Jellyfin API key', 'JELLYFIN_API_KEY')}
-                <input type="password" value={envValues.JELLYFIN_API_KEY}
-                  onChange={e => updateEnv('JELLYFIN_API_KEY', e.target.value)} className={inputCls} />
-              </div>
-              <div>
-                {fieldLabel('Admin token', 'ADMIN_TOKEN')}
-                <input type="password" value={envValues.ADMIN_TOKEN}
-                  onChange={e => updateEnv('ADMIN_TOKEN', e.target.value)} className={inputCls} />
-              </div>
-              <div>
-                {fieldLabel('Public base URL', 'PUBLIC_BASE_URL')}
-                <input type="text" value={envValues.PUBLIC_BASE_URL}
-                  onChange={e => updateEnv('PUBLIC_BASE_URL', e.target.value)} className={inputCls} />
-              </div>
-              <div>
-                {fieldLabel('Database path', 'DB_PATH')}
-                <input type="text" value={envValues.DB_PATH}
-                  onChange={e => updateEnv('DB_PATH', e.target.value)} className={inputCls} />
-              </div>
-              <div>
-                {fieldLabel('Backgrounds directory', 'BACKGROUNDS_DIR')}
-                <input type="text" value={envValues.BACKGROUNDS_DIR}
-                  onChange={e => updateEnv('BACKGROUNDS_DIR', e.target.value)} className={inputCls} />
-              </div>
-              <div>
-                {fieldLabel('Link ID length (8–16)', 'LINK_ID_LENGTH')}
-                <input type="number" min="8" max="16" value={envValues.LINK_ID_LENGTH}
-                  onChange={e => updateEnv('LINK_ID_LENGTH', e.target.value)} className={inputCls} />
-              </div>
-              <div>
-                {fieldLabel('Rate limit — max requests', 'RATE_LIMIT_MAX_REQUESTS')}
-                <input type="number" min="1" value={envValues.RATE_LIMIT_MAX_REQUESTS}
-                  onChange={e => updateEnv('RATE_LIMIT_MAX_REQUESTS', e.target.value)} className={inputCls} />
-              </div>
-              <div>
-                {fieldLabel('Rate limit — window (seconds)', 'RATE_LIMIT_WINDOW_SECONDS')}
-                <input type="number" min="1" value={envValues.RATE_LIMIT_WINDOW_SECONDS}
-                  onChange={e => updateEnv('RATE_LIMIT_WINDOW_SECONDS', e.target.value)} className={inputCls} />
-              </div>
-            </div>
 
-            {/* content_config.json — applies immediately */}
-            <div className="border-t border-gray-700 pt-4 space-y-3">
-              <p className="text-xs text-green-400 uppercase tracking-wide font-semibold">
-                These settings apply immediately
-              </p>
+              {/* content_config.json — applies immediately */}
+              <div className="space-y-3 md:border-l md:border-gray-700 md:pl-8">
+                <p className="text-xs text-green-400 uppercase tracking-wide font-semibold">
+                  These settings apply immediately
+                </p>
 
-              <div>
-                <label className={labelCls}>Site title</label>
-                <input type="text" value={contentValues.site_title}
-                  onChange={e => updateContent('site_title', e.target.value)} className={inputCls} />
-              </div>
-              <div>
-                <label className={labelCls}>Logo path</label>
-                <input type="text" value={contentValues.logo_path ?? ''}
-                  onChange={e => updateContent('logo_path', e.target.value)} className={inputCls} />
-              </div>
-              <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={contentValues.animations_enabled}
-                  onChange={e => updateContent('animations_enabled', e.target.checked)}
-                  className="rounded accent-purple-500"
-                />
-                Enable visual flavor system (title glitch, background, logo, flavor text)
-              </label>
-              <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={contentValues.flavor_texts_enabled}
-                  onChange={e => updateContent('flavor_texts_enabled', e.target.checked)}
-                  className="rounded accent-purple-500"
-                />
-                Enable floating flavor text
-              </label>
-              <div>
-                <label className={labelCls}>Flavor text pool (one per line)</label>
-                <textarea
-                  rows={4}
-                  value={flavorTextsRaw}
-                  onChange={e => setFlavorTextsRaw(e.target.value)}
-                  className={inputCls}
-                />
+                <div>
+                  <label className={labelCls}>Site title</label>
+                  <input type="text" value={contentValues.site_title}
+                    onChange={e => updateContent('site_title', e.target.value)} className={inputCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>Logo path</label>
+                  <input type="text" value={contentValues.logo_path ?? ''}
+                    onChange={e => updateContent('logo_path', e.target.value)} className={inputCls} />
+                </div>
+
+                <div className="pt-1">
+                  <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Visual flavor</p>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={contentValues.glitch_enabled}
+                        onChange={e => updateContent('glitch_enabled', e.target.checked)}
+                        className="rounded accent-purple-500"
+                      />
+                      Title glitch / color-cycle
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={contentValues.background_enabled}
+                        onChange={e => updateContent('background_enabled', e.target.checked)}
+                        className="rounded accent-purple-500"
+                      />
+                      Background
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={contentValues.logo_flash_enabled}
+                        onChange={e => updateContent('logo_flash_enabled', e.target.checked)}
+                        className="rounded accent-purple-500"
+                      />
+                      Logo flash
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={contentValues.flavor_text_enabled}
+                        onChange={e => updateContent('flavor_text_enabled', e.target.checked)}
+                        className="rounded accent-purple-500"
+                      />
+                      Floating flavor text
+                    </label>
+                  </div>
+                </div>
+
+                <div>
+                  <label className={labelCls}>Flavor text pool (one per line)</label>
+                  <textarea
+                    rows={4}
+                    value={flavorTextsRaw}
+                    onChange={e => setFlavorTextsRaw(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
               </div>
             </div>
 

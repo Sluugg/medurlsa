@@ -41,8 +41,10 @@ class EnvSettingsUpdate(BaseModel):
 class ContentConfigSettingsUpdate(BaseModel):
     site_title: Optional[str] = None
     logo_path: Optional[str] = None
-    animations_enabled: Optional[bool] = None
-    flavor_texts_enabled: Optional[bool] = None
+    glitch_enabled: Optional[bool] = None
+    background_enabled: Optional[bool] = None
+    logo_flash_enabled: Optional[bool] = None
+    flavor_text_enabled: Optional[bool] = None
     flavor_texts: Optional[list[str]] = None
 
 

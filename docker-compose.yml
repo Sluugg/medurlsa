@@ -1,8 +1,8 @@
-# Before first run: mkdir -p data backgrounds && chown -R 1000:1000 data backgrounds
-# The container runs as a non-root user pinned to UID/GID 1000 — since bind
-# mounts take the host directory's ownership as-is, the app can't write to
-# ./data (or ./backgrounds) unless the host directories are owned by 1000:1000
-# first.
+# No manual setup needed for ./data or ./backgrounds — the container starts
+# as root just long enough to chown them to its unprivileged user (UID/GID
+# 1000) on every start, then drops privileges before running the app (see
+# docker-entrypoint.sh). This covers the common case where Docker
+# auto-creates a missing bind-mount source directory as root:root.
 
 services:
   web-share-app:

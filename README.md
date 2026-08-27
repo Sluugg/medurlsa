@@ -68,12 +68,10 @@ DB_PATH            — Path to the SQLite database file (default: data/links.db)
 ### 2a. Docker
 
 ```bash
-mkdir -p data backgrounds
-chown -R 1000:1000 data backgrounds
 docker compose up -d --build
 ```
 
-The `chown` step matters: the container runs as a non-root user pinned to UID/GID 1000, and Docker bind mounts use the *host* directory's ownership as-is — skip it and the app won't be able to write the SQLite database.
+No manual setup needed for `./data`/`./backgrounds` — the container runs as a non-root user (UID/GID 1000), and its entrypoint fixes ownership on those mounted directories at every start before dropping privileges, so a fresh (or Docker-auto-created, root-owned) directory just works.
 
 This builds the image (frontend assets are built inside a throwaway Node stage, not on your host), starts the container listening on `8000` inside, and maps it to `8000` on the host — edit the `ports:` line in `docker-compose.yml` if you want a different host port, or put a reverse proxy in front for TLS/port 80/443. `./data` and `./backgrounds` are bind-mounted so links and background files persist across rebuilds. A single worker is used inside the container for the same reason as the native install (see below).
 

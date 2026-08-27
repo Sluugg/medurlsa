@@ -107,11 +107,13 @@ async def get_settings(_: str = Depends(require_admin)):
         },
         "env_pending": _pending_env_keys(),
         "content_config": {
-            "site_title":           CONTENT_CONFIG["site_title"],
-            "logo_path":            CONTENT_CONFIG["logo_path"],
-            "animations_enabled":   CONTENT_CONFIG["animations_enabled"],
-            "flavor_texts_enabled": CONTENT_CONFIG["flavor_texts_enabled"],
-            "flavor_texts":         CONTENT_CONFIG["flavor_texts"],
+            "site_title":          CONTENT_CONFIG["site_title"],
+            "logo_path":           CONTENT_CONFIG["logo_path"],
+            "glitch_enabled":      CONTENT_CONFIG["glitch_enabled"],
+            "background_enabled":  CONTENT_CONFIG["background_enabled"],
+            "logo_flash_enabled":  CONTENT_CONFIG["logo_flash_enabled"],
+            "flavor_text_enabled": CONTENT_CONFIG["flavor_text_enabled"],
+            "flavor_texts":        CONTENT_CONFIG["flavor_texts"],
         },
     }
 
