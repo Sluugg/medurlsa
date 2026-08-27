@@ -24,7 +24,7 @@ keep in sync.
 
 import os
 
-from dotenv import set_key
+from dotenv import dotenv_values, set_key
 from fastapi import APIRouter, Depends
 
 from app.auth import require_admin
@@ -51,6 +51,46 @@ router = APIRouter()
 _MASKED = "•" * 8
 
 
+def _pending_env_keys() -> list[str]:
+    """
+    Compare the .env file on disk against the values actually active in this
+    running process (the constants app/config.py already imported at
+    startup). Any key that differs has been saved but won't take effect
+    until a restart re-runs load_dotenv() picks it up — see this module's
+    docstring. Only ever returns key names, never values, so this is safe to
+    run over the secret fields too.
+    """
+    if not os.path.exists(ENV_PATH):
+        return []
+    on_disk = dotenv_values(ENV_PATH)
+    # JELLYFIN_URL/PUBLIC_BASE_URL get .rstrip("/") applied when loaded
+    # (app/config.py) — apply the same normalization before comparing, or an
+    # unchanged trailing slash in the file would look like a pending change.
+    active = {
+        "JELLYFIN_URL":              JELLYFIN_URL,
+        "JELLYFIN_API_KEY":          JELLYFIN_API_KEY,
+        "ADMIN_TOKEN":               ADMIN_TOKEN,
+        "PUBLIC_BASE_URL":           PUBLIC_BASE_URL,
+        "DB_PATH":                   DB_PATH,
+        "BACKGROUNDS_DIR":           BACKGROUNDS_DIR,
+        "LINK_ID_LENGTH":            str(LINK_ID_LENGTH),
+        "RATE_LIMIT_MAX_REQUESTS":   str(RATE_LIMIT_MAX_REQUESTS),
+        "RATE_LIMIT_WINDOW_SECONDS": str(RATE_LIMIT_WINDOW_SECONDS),
+    }
+    normalize = {"JELLYFIN_URL", "PUBLIC_BASE_URL"}
+
+    pending = []
+    for key, active_value in active.items():
+        disk_value = on_disk.get(key)
+        if disk_value is None:
+            continue  # not set in the file at all — using the code default, nothing pending
+        if key in normalize:
+            disk_value = disk_value.rstrip("/")
+        if disk_value != active_value:
+            pending.append(key)
+    return pending
+
+
 @router.get("/admin/settings")
 async def get_settings(_: str = Depends(require_admin)):
     return {
@@ -65,6 +105,7 @@ async def get_settings(_: str = Depends(require_admin)):
             "RATE_LIMIT_MAX_REQUESTS":   RATE_LIMIT_MAX_REQUESTS,
             "RATE_LIMIT_WINDOW_SECONDS": RATE_LIMIT_WINDOW_SECONDS,
         },
+        "env_pending": _pending_env_keys(),
         "content_config": {
             "site_title":           CONTENT_CONFIG["site_title"],
             "logo_path":            CONTENT_CONFIG["logo_path"],

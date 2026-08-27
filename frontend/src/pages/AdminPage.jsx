@@ -429,6 +429,7 @@ function CreateLinkModal({ item, token, availableBackgrounds, onCreated, onClose
 
 function SettingsModal({ token, onClose }) {
   const [envValues, setEnvValues]         = useState(null)
+  const [envPending, setEnvPending]       = useState([])
   const [contentValues, setContentValues] = useState(null)
   const [flavorTextsRaw, setFlavorTextsRaw] = useState('')
   const [loading, setLoading]   = useState(true)
@@ -436,28 +437,38 @@ function SettingsModal({ token, onClose }) {
   const [error, setError]       = useState('')
   const [savedMsg, setSavedMsg] = useState('')
 
+  // Fetches current settings; returns the parsed body, or null on failure
+  // (with `error` already set). Doesn't touch component state itself, so
+  // callers can guard against a stale response after unmount if needed.
+  async function fetchSettings() {
+    let r
+    try {
+      r = await fetch('/api/admin/settings', { headers: authHeaders(token) })
+    } catch {
+      setError(UNREACHABLE_MSG)
+      return null
+    }
+    if (!r.ok) {
+      setError(await apiErrorMessage(r))
+      return null
+    }
+    return r.json()
+  }
+
+  function applySettings(data) {
+    setEnvValues(data.env)
+    setEnvPending(data.env_pending)
+    setContentValues(data.content_config)
+    setFlavorTextsRaw(data.content_config.flavor_texts.join('\n'))
+  }
+
   useEffect(() => {
     let cancelled = false
-    ;(async () => {
-      let r
-      try {
-        r = await fetch('/api/admin/settings', { headers: authHeaders(token) })
-      } catch {
-        if (!cancelled) { setError(UNREACHABLE_MSG); setLoading(false) }
-        return
-      }
-      if (!r.ok) {
-        if (!cancelled) { setError(await apiErrorMessage(r)); setLoading(false) }
-        return
-      }
-      const data = await r.json()
-      if (!cancelled) {
-        setEnvValues(data.env)
-        setContentValues(data.content_config)
-        setFlavorTextsRaw(data.content_config.flavor_texts.join('\n'))
-        setLoading(false)
-      }
-    })()
+    fetchSettings().then(data => {
+      if (cancelled) return
+      if (data) applySettings(data)
+      setLoading(false)
+    })
     return () => { cancelled = true }
   }, [token])
 
@@ -497,7 +508,6 @@ function SettingsModal({ token, onClose }) {
       setError(UNREACHABLE_MSG)
       return
     }
-    setSaving(false)
     if (r.ok) {
       const result = await r.json()
       setSavedMsg(
@@ -505,13 +515,30 @@ function SettingsModal({ token, onClose }) {
           ? 'Saved. Restart the server for the .env changes to take effect.'
           : 'Saved.'
       )
+      // Refresh env_pending so the * markers show up immediately, without
+      // needing to close and reopen the modal.
+      if (result.restart_required) {
+        const data = await fetchSettings()
+        if (data) applySettings(data)
+      }
     } else {
       setError(await apiErrorMessage(r))
     }
+    setSaving(false)
   }
 
   const inputCls = 'w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500'
   const labelCls = 'block text-xs text-gray-400 mb-1'
+
+  // .env field label, marked with a * when saved-but-not-yet-active (see envPending).
+  function fieldLabel(text, key) {
+    return (
+      <label className={labelCls}>
+        {text}
+        {envPending.includes(key) && <span className="text-yellow-400"> *</span>}
+      </label>
+    )
+  }
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4 overflow-y-auto py-4" onClick={onClose}>
@@ -529,49 +556,54 @@ function SettingsModal({ token, onClose }) {
               <p className="text-xs text-yellow-400 uppercase tracking-wide font-semibold">
                 These settings will require an app restart
               </p>
+              {envPending.length > 0 && (
+                <p className="text-xs text-yellow-400">
+                  * — saved, will apply after the next restart
+                </p>
+              )}
 
               <div>
-                <label className={labelCls}>Jellyfin URL</label>
+                {fieldLabel('Jellyfin URL', 'JELLYFIN_URL')}
                 <input type="text" value={envValues.JELLYFIN_URL}
                   onChange={e => updateEnv('JELLYFIN_URL', e.target.value)} className={inputCls} />
               </div>
               <div>
-                <label className={labelCls}>Jellyfin API key</label>
+                {fieldLabel('Jellyfin API key', 'JELLYFIN_API_KEY')}
                 <input type="password" value={envValues.JELLYFIN_API_KEY}
                   onChange={e => updateEnv('JELLYFIN_API_KEY', e.target.value)} className={inputCls} />
               </div>
               <div>
-                <label className={labelCls}>Admin token</label>
+                {fieldLabel('Admin token', 'ADMIN_TOKEN')}
                 <input type="password" value={envValues.ADMIN_TOKEN}
                   onChange={e => updateEnv('ADMIN_TOKEN', e.target.value)} className={inputCls} />
               </div>
               <div>
-                <label className={labelCls}>Public base URL</label>
+                {fieldLabel('Public base URL', 'PUBLIC_BASE_URL')}
                 <input type="text" value={envValues.PUBLIC_BASE_URL}
                   onChange={e => updateEnv('PUBLIC_BASE_URL', e.target.value)} className={inputCls} />
               </div>
               <div>
-                <label className={labelCls}>Database path</label>
+                {fieldLabel('Database path', 'DB_PATH')}
                 <input type="text" value={envValues.DB_PATH}
                   onChange={e => updateEnv('DB_PATH', e.target.value)} className={inputCls} />
               </div>
               <div>
-                <label className={labelCls}>Backgrounds directory</label>
+                {fieldLabel('Backgrounds directory', 'BACKGROUNDS_DIR')}
                 <input type="text" value={envValues.BACKGROUNDS_DIR}
                   onChange={e => updateEnv('BACKGROUNDS_DIR', e.target.value)} className={inputCls} />
               </div>
               <div>
-                <label className={labelCls}>Link ID length (8–16)</label>
+                {fieldLabel('Link ID length (8–16)', 'LINK_ID_LENGTH')}
                 <input type="number" min="8" max="16" value={envValues.LINK_ID_LENGTH}
                   onChange={e => updateEnv('LINK_ID_LENGTH', e.target.value)} className={inputCls} />
               </div>
               <div>
-                <label className={labelCls}>Rate limit — max requests</label>
+                {fieldLabel('Rate limit — max requests', 'RATE_LIMIT_MAX_REQUESTS')}
                 <input type="number" min="1" value={envValues.RATE_LIMIT_MAX_REQUESTS}
                   onChange={e => updateEnv('RATE_LIMIT_MAX_REQUESTS', e.target.value)} className={inputCls} />
               </div>
               <div>
-                <label className={labelCls}>Rate limit — window (seconds)</label>
+                {fieldLabel('Rate limit — window (seconds)', 'RATE_LIMIT_WINDOW_SECONDS')}
                 <input type="number" min="1" value={envValues.RATE_LIMIT_WINDOW_SECONDS}
                   onChange={e => updateEnv('RATE_LIMIT_WINDOW_SECONDS', e.target.value)} className={inputCls} />
               </div>

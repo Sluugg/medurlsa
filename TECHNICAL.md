@@ -207,11 +207,26 @@ Editorial and presentation configuration. Controls what viewers see and how visu
 | `site_title` | Text displayed in the title banner on the watch page |
 | `logo_path` | Path to a logo image file for the LogoFlash overlay |
 | `animations_enabled` | Deployment-wide master switch for the whole visual flavor system (title glitch/jitter/color-cycle, background, floating flavor text, logo overlay). Defaults to `false` so a fresh clone with no `content_config.json` renders a plain watch page — distinct from the per-link `flavor_enabled` DB column, which only has effect when this is `true` |
+| `flavor_texts_enabled` | Independent of `animations_enabled` — turns the floating flavor-text feature off specifically while background/logo/title effects stay on. Has no effect if `animations_enabled` (or the per-link `flavor_enabled`) is already off |
 | `flavor_texts` | Pool of strings that float across the screen during playback |
 | `timing.glitch` | Interval range and duration for the VHS glitch effect on the title |
 | `timing.color_cycle` | Interval range, duration, and step rate for synthwave color cycling |
 | `timing.flavor_text` | Interval range and hold duration for floating flavor text |
 | `timing.logo_flash` | Interval range and hold duration for the logo overlay |
+
+---
+
+## Admin settings page
+
+`GET`/`PUT /api/admin/settings` (`app/routes/settings.py`), surfaced in the admin portal behind the gear icon, lets an admin view and edit a subset of `.env` and `content_config.json` without shell/file access. Both files remain the actual source of truth — this is a UI in front of them, not a separate settings store.
+
+The two files behave differently once written:
+- **`content_config.json` changes apply immediately.** `save_content_config()` writes the file and calls `reload_content_config()`, which mutates the existing `CONTENT_CONFIG` dict in place (clear + update, not reassignment) — every module that already did `from app.content_config import CONTENT_CONFIG` holds a reference to that same dict object, so the change is visible on the very next request, no restart needed.
+- **`.env` changes require a restart.** Every `.env`-backed value is read once into a plain module-level constant in `app/config.py` at import time, and several other modules import those constants directly — writing a new value to the file doesn't change a constant some other module already imported. The settings endpoint writes via `python-dotenv`'s `set_key()` and reports `restart_required: true`, but can't make the change take effect itself.
+
+To make "saved but not yet active" visible in the UI, `GET /api/admin/settings` also returns `env_pending`: a list of key names where the on-disk `.env` value differs from what's actually active in the running process (compared via `dotenv_values()`, which parses the file without touching `os.environ`). The frontend marks those fields with a `*`. This comparison never needs to expose either value for the two secret fields (`JELLYFIN_API_KEY`, `ADMIN_TOKEN`) — it only returns whether they differ, not what they are.
+
+Secrets are masked in the GET response (a placeholder, not the real value) and skipped on write if the PUT echoes that same placeholder back unchanged — only a genuinely different submitted value (including an explicit empty string) overwrites one.
 
 ---
 

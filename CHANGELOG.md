@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `og:description`/`twitter:description`/`<meta name="description">` on share link previews, and a `max-image-preview:large` robots directive so Google will render the preview image
 - `animations_enabled` deployment-wide config switch (`content_config.json`) — a master on/off for the entire visual flavor system (title glitch/jitter/color-cycle, background, floating flavor text, logo overlay), defaulting to off so a fresh clone renders a plain watch page out of the box
 - Basic per-IP rate limiting (`app/rate_limit.py`) on the public register and cover-art endpoints, configurable via `RATE_LIMIT_MAX_REQUESTS`/`RATE_LIMIT_WINDOW_SECONDS`
+- In-app settings page in the admin portal (gear icon, top-right) for viewing/editing the same values that live in `.env` and `content_config.json` — the latter applies immediately, the former requires a restart and is marked with a `*` on any field that's been saved but isn't active yet
+- `flavor_texts_enabled` config switch — independent of `animations_enabled`, lets the floating flavor-text feature specifically be turned off while background/logo/title effects stay on
 
 ### Changed
 - Link previews (Open Graph) show the site name as the title again, with the specific track/artist detail moved into the new description instead
