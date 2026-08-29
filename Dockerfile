@@ -27,6 +27,7 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app/ ./app/
+COPY assets/ ./assets/
 COPY --from=frontend-build /build/frontend/dist ./frontend/dist
 
 # data/ and backgrounds/ are expected to be mounted as volumes (see

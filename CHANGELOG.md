@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Four independent deployment-wide config switches (`content_config.json`) for the visual flavor system — `glitch_enabled`, `background_enabled`, `logo_flash_enabled`, `flavor_text_enabled` — each defaulting to off so a fresh clone renders a plain watch page out of the box
 - Basic per-IP rate limiting (`app/rate_limit.py`) on the public register and cover-art endpoints, configurable via `RATE_LIMIT_MAX_REQUESTS`/`RATE_LIMIT_WINDOW_SECONDS`
 - In-app settings page in the admin portal (gear icon, top-right) for viewing/editing the same values that live in `.env` and `content_config.json` — the latter applies immediately, the former requires a restart and is marked with a `*` on any field that's been saved but isn't active yet
+- A default logo (`assets/logo.png`, committed to the repo) — `logo_path` now defaults to this instead of `None`, so the favicon/LogoFlash overlay work out of the box with no `content_config.json` at all. Distinct from `./branding` (gitignored, bind-mounted under Docker), which is for overriding it with your own
 
 ### Changed
 - Project renamed from `web_share_app`/`dopelink` to **medurlsa** — the default `site_title`, the service/system-user name (`install.sh`, `SECURITY.md`, `Dockerfile`, `docker-entrypoint.sh`), and the `frontend/package.json`/`docker-compose.yml` service names all updated to match

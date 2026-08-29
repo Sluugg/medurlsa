@@ -5,6 +5,7 @@
 content_config.json
 data/
 backgrounds/
+branding/
 
 # Python
 .venv/

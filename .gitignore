@@ -2,6 +2,7 @@
 data/
 .venv/
 backgrounds/
+branding/
 content_config.json
 __pycache__/
 *.pyc

@@ -13,9 +13,15 @@ import os
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _CONFIG_PATH  = os.path.join(_PROJECT_ROOT, "content_config.json")
 
+# Shipped default logo — committed to the repo (unlike branding/, which is
+# gitignored and meant for per-deployment customization). Works out of the
+# box for a fresh clone with no content_config.json; overriding logo_path
+# (e.g. to something in branding/) takes precedence as usual.
+_DEFAULT_LOGO_PATH = os.path.join(_PROJECT_ROOT, "assets", "logo.png")
+
 _DEFAULTS: dict = {
     "site_title": "medurlsa",
-    "logo_path":  None,
+    "logo_path":  _DEFAULT_LOGO_PATH,
     # Deployment-wide switches for the visual flavor system, one per effect —
     # independent of each other, so e.g. background can stay on while glitch
     # is off. Each still only has effect on a given link when the per-link
