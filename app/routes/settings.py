@@ -24,8 +24,8 @@ keep in sync.
 
 import os
 
-from dotenv import dotenv_values, set_key
-from fastapi import APIRouter, Depends
+from dotenv import dotenv_values
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.auth import require_admin
 from app.config import (
@@ -49,6 +49,46 @@ router = APIRouter()
 # back unchanged means "leave it as-is" — only a genuinely different value
 # (including an explicit empty string) overwrites it.
 _MASKED = "•" * 8
+
+
+def _quote_env_value(value: str) -> str:
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
+
+
+def _write_env_file(path: str, updates: dict) -> None:
+    """
+    Update or add key=value lines in an existing .env file, writing directly
+    in place rather than via python-dotenv's set_key(). set_key() writes a
+    temp file in the same directory and atomically os.replace()s it over the
+    target — the standard safe way to write a config file, but it breaks
+    when .env is a single-file Docker bind mount (docker-compose.yml): the
+    temp file lives on the container's own filesystem while the bind-mounted
+    target is a separate mount point, so the rename becomes a cross-device
+    rename, which Linux refuses (OSError: Invalid cross-device link). This
+    writes into the existing file/inode directly instead, which bind mounts
+    handle fine — at the cost of the crash-safety atomic replace would give,
+    an acceptable trade for a low-frequency, user-initiated write.
+    """
+    lines = []
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+
+    remaining = dict(updates)
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key = stripped.split("=", 1)[0].strip()
+        if key in remaining:
+            lines[i] = f"{key}={_quote_env_value(str(remaining.pop(key)))}\n"
+
+    for key, value in remaining.items():
+        lines.append(f"{key}={_quote_env_value(str(value))}\n")
+
+    with open(path, "w", encoding="utf-8") as f:
+        f.writelines(lines)
 
 
 def _pending_env_keys() -> list[str]:
@@ -131,17 +171,17 @@ async def update_settings(
             if updates.get(secret_key) == _MASKED:
                 del updates[secret_key]  # placeholder echoed back — leave unchanged
         if updates:
-            if not os.path.exists(ENV_PATH):
-                open(ENV_PATH, "a").close()
-            for key, value in updates.items():
-                set_key(ENV_PATH, key, str(value))
+            _write_env_file(ENV_PATH, updates)
             restart_required = True
 
     content_config_updated = False
     if body.content_config is not None:
         updates = body.content_config.model_dump(exclude_unset=True)
         if updates:
-            save_content_config(updates)
+            try:
+                save_content_config(updates)
+            except RuntimeError as exc:
+                raise HTTPException(status_code=500, detail=str(exc))
             content_config_updated = True
 
     return {

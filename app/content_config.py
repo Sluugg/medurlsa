@@ -14,7 +14,7 @@ _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _CONFIG_PATH  = os.path.join(_PROJECT_ROOT, "content_config.json")
 
 _DEFAULTS: dict = {
-    "site_title": "dopelink",
+    "site_title": "medurlsa",
     "logo_path":  None,
     # Deployment-wide switches for the visual flavor system, one per effect —
     # independent of each other, so e.g. background can stay on while glitch
@@ -84,7 +84,12 @@ def _deep_merge(base: dict, override: dict) -> dict:
 
 
 def _load() -> dict:
-    if not os.path.exists(_CONFIG_PATH):
+    # isfile(), not exists(): a Docker bind mount whose host source is
+    # missing auto-creates an empty *directory* at this path, which exists()
+    # would treat as present. isfile() correctly falls back to defaults for
+    # that case the same as a genuinely absent file, instead of crashing on
+    # open() below.
+    if not os.path.isfile(_CONFIG_PATH):
         return dict(_DEFAULTS)
     with open(_CONFIG_PATH, "r", encoding="utf-8") as f:
         user_config = json.load(f)
@@ -114,7 +119,14 @@ def save_content_config(updates: dict) -> None:
     already in the file that aren't managed by the settings page are left
     untouched.
     """
-    if os.path.exists(_CONFIG_PATH):
+    if os.path.exists(_CONFIG_PATH) and not os.path.isfile(_CONFIG_PATH):
+        raise RuntimeError(
+            f"{_CONFIG_PATH} exists but isn't a regular file — likely an "
+            f"empty directory Docker auto-created for a missing bind-mount "
+            f"source. Create a real file on the host first (e.g. "
+            f"`cp content_config.example.json content_config.json`), then retry."
+        )
+    if os.path.isfile(_CONFIG_PATH):
         with open(_CONFIG_PATH, "r", encoding="utf-8") as f:
             current = json.load(f)
     else:

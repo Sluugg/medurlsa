@@ -5,7 +5,7 @@
 # auto-creates a missing bind-mount source directory as root:root.
 
 services:
-  web-share-app:
+  medurlsa:
     build: .
     restart: unless-stopped
     ports:
@@ -21,8 +21,23 @@ services:
     volumes:
       - ./data:/app/data
       - ./backgrounds:/app/backgrounds
-      # Uncomment to use a custom content_config.json (site title, logo,
-      # flavor text, timing). Create the file first — e.g.
-      # `cp content_config.example.json content_config.json` — Docker will
-      # mount an empty directory instead of a file if the source is missing.
-      # - ./content_config.json:/app/content_config.json:ro
+      # Dedicated home for logo_path — deliberately separate from
+      # ./backgrounds, which is scanned wholesale for the background picker
+      # and random-background selection. A logo dropped into ./backgrounds
+      # would show up there too. Point logo_path at e.g.
+      # "branding/logo.png" (relative — resolves against the container's
+      # /app working directory, matching this mount).
+      - ./branding:/app/branding
+      # Bind-mounted (not just referenced via env_file above) so writes from
+      # the admin settings page land on the real host .env, not just the
+      # container's own throwaway filesystem layer — env_file only injects
+      # variables at container creation, it doesn't give the container a
+      # live view of the file. Requires .env to already exist on the host
+      # (README step 1) — same as env_file above already does.
+      - ./.env:/app/.env
+      # Bind-mounted for the same reason as .env above — otherwise a
+      # content_config save from the admin settings page would only land on
+      # the container's own throwaway filesystem layer and be lost on the
+      # next `docker compose down`. Not :ro — the settings page needs to
+      # write it. 
+      - ./content_config.json:/app/content_config.json

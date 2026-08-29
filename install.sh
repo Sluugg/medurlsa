@@ -1,13 +1,13 @@
 #!/bin/sh
 # install.sh — installs dependencies, builds the frontend, and configures a
-# system service for web_share_app. Detects Alpine (OpenRC) and Debian/Ubuntu
+# system service for medurlsa. Detects Alpine (OpenRC) and Debian/Ubuntu
 # (systemd) automatically. Must be run as root.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 APP_DIR="$SCRIPT_DIR"
-SERVICE_NAME="webshare"
-SERVICE_USER="webshare"
+SERVICE_NAME="medurlsa"
+SERVICE_USER="medurlsa"
 UVICORN="$APP_DIR/.venv/bin/uvicorn"
 LOG_DIR="/var/log/$SERVICE_NAME"
 
@@ -176,7 +176,7 @@ case "$PLATFORM" in
 #!/sbin/openrc-run
 
 name="$SERVICE_NAME"
-description="Web Share App"
+description="Medurlsa"
 directory="$APP_DIR"
 command="$UVICORN"
 command_args="app.main:app --host 0.0.0.0 --port 8000 --workers 1"
@@ -202,7 +202,7 @@ EOF
         info "Installing systemd service..."
         cat > "/etc/systemd/system/$SERVICE_NAME.service" <<EOF
 [Unit]
-Description=Web Share App
+Description=Medurlsa
 After=network.target
 
 [Service]

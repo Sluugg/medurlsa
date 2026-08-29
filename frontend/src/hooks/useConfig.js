@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react'
 
 const DEFAULT_CONFIG = {
-  site_title:            'dopelink',
+  site_title:            'medurlsa',
   has_logo:              false,
   glitch_enabled:        false,
   background_enabled:    false,

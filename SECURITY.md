@@ -1,6 +1,6 @@
 # Security Hardening Guide
 
-This document covers recommended security measures for deploying web_share_app in a public-facing environment. Items marked **[implemented]** are already handled by the application or installer. All others require manual configuration.
+This document covers recommended security measures for deploying medurlsa in a public-facing environment. Items marked **[implemented]** are already handled by the application or installer. All others require manual configuration.
 
 ---
 
@@ -50,20 +50,20 @@ more_clear_headers Server;
 
 ### Non-root service user [implemented]
 
-The installer creates a system account `webshare` with no login shell and no home directory, and runs the service as that user. File permissions are set as follows:
+The installer creates a system account `medurlsa` with no login shell and no home directory, and runs the service as that user. File permissions are set as follows:
 
 | Path | Owner | Mode | Purpose |
 |---|---|---|---|
-| `$APP_DIR/` | `webshare` | `750` | App root, not world-readable |
-| `$APP_DIR/.env` | `webshare` | `600` | Secrets, owner-only |
-| `$APP_DIR/data/` | `webshare` | `700` | SQLite database, owner-only |
-| `$APP_DIR/backgrounds/` | `webshare` | `755` | Background files |
-| `/var/log/webshare/` | `webshare` | `750` | Log files |
+| `$APP_DIR/` | `medurlsa` | `750` | App root, not world-readable |
+| `$APP_DIR/.env` | `medurlsa` | `600` | Secrets, owner-only |
+| `$APP_DIR/data/` | `medurlsa` | `700` | SQLite database, owner-only |
+| `$APP_DIR/backgrounds/` | `medurlsa` | `755` | Background files |
+| `/var/log/medurlsa/` | `medurlsa` | `750` | Log files |
 
 If you add background files after installation, they will be owned by root by default and may not be readable by the service. Fix with:
 
 ```sh
-chown webshare:webshare /path/to/web_share_app/backgrounds/*
+chown medurlsa:medurlsa /path/to/medurlsa/backgrounds/*
 ```
 
 ---
@@ -98,12 +98,12 @@ rc-update add nftables boot
 
 **If the reverse proxy is on the same host**, bind Uvicorn to localhost only instead. Edit the service definition to use `--host 127.0.0.1`:
 
-*OpenRC* (`/etc/init.d/webshare`):
+*OpenRC* (`/etc/init.d/medurlsa`):
 ```sh
 command_args="app.main:app --host 127.0.0.1 --port 8000 --workers 1"
 ```
 
-*systemd* (`/etc/systemd/system/webshare.service`):
+*systemd* (`/etc/systemd/system/medurlsa.service`):
 ```ini
 ExecStart=/path/to/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
 ```
@@ -174,7 +174,7 @@ These prevent a compromised or misbehaving container from impacting other servic
 
 Create a dedicated Jellyfin service account for this app rather than using your admin API key. The app only needs read access to the library. If the key is ever exposed, the blast radius is limited to read access on media metadata and streams — not Jellyfin administration.
 
-In Jellyfin: **Dashboard → API Keys → + (Add)** — create a key named `webshare` and note it is not associated with an admin user.
+In Jellyfin: **Dashboard → API Keys → + (Add)** — create a key named `medurlsa` and note it is not associated with an admin user.
 
 ### ADMIN_TOKEN strength
 
@@ -189,8 +189,8 @@ openssl rand -base64 32
 The installer sets `.env` to mode `600` (owner read/write only). Verify this is intact after any manual edits:
 
 ```sh
-ls -la /path/to/web_share_app/.env
-# Should show: -rw------- 1 webshare webshare
+ls -la /path/to/medurlsa/.env
+# Should show: -rw------- 1 medurlsa medurlsa
 ```
 
 ---
@@ -198,5 +198,5 @@ ls -la /path/to/web_share_app/.env
 ## Ongoing
 
 - **Keep Alpine packages updated:** `apk upgrade` periodically, or set up `apk-cron` for automatic security updates.
-- **Monitor logs** at `/var/log/webshare/` for unusual patterns — repeated 401s on `/api/admin`, unexpected IPs, abnormal stream request volumes.
+- **Monitor logs** at `/var/log/medurlsa/` for unusual patterns — repeated 401s on `/api/admin`, unexpected IPs, abnormal stream request volumes.
 - **Rotate the ADMIN_TOKEN** if you suspect it has been observed. Update `.env` and restart the service.

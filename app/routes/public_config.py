@@ -25,14 +25,21 @@ _ALLOWED_EXTS = _VIDEO_EXTS | _IMAGE_EXTS
 @router.get("/public/config")
 async def get_public_config():
     """Return all config the watch page needs: site identity, flavor texts, timing, backgrounds."""
+    logo_path = CONTENT_CONFIG.get("logo_path")
+    has_logo  = bool(logo_path and os.path.isfile(str(logo_path)))
+    # Excluded by basename in case the logo ever ends up inside
+    # BACKGROUNDS_DIR anyway (e.g. a native install sharing one directory
+    # for convenience) — it should never be selectable/random as a
+    # background regardless of where it's actually stored.
+    logo_basename = os.path.basename(str(logo_path)) if logo_path else None
+
     available_backgrounds: list[str] = []
     if os.path.isdir(BACKGROUNDS_DIR):
         for fname in sorted(os.listdir(BACKGROUNDS_DIR)):
+            if fname == logo_basename:
+                continue
             if os.path.splitext(fname)[1].lower() in _ALLOWED_EXTS:
                 available_backgrounds.append(fname)
-
-    logo_path = CONTENT_CONFIG.get("logo_path")
-    has_logo  = bool(logo_path and os.path.isfile(str(logo_path)))
 
     return {
         "site_title":            CONTENT_CONFIG["site_title"],

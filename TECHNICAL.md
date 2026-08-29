@@ -1,6 +1,6 @@
 # Technical Reference
 
-This document describes the architecture, tech stack, and design decisions behind the web share app.
+This document describes the architecture, tech stack, and design decisions behind Medurlsa.
 
 ---
 
@@ -205,7 +205,7 @@ Editorial and presentation configuration. Controls what viewers see and how visu
 | Key | Purpose |
 |---|---|
 | `site_title` | Text displayed in the title banner on the watch page |
-| `logo_path` | Path to a logo image file for the LogoFlash overlay |
+| `logo_path` | Path to a logo image file for the LogoFlash overlay and favicon. Under Docker, point this at `./branding` (bind-mounted), not `./backgrounds` — `get_public_config()` (`app/routes/public_config.py`) excludes the logo's basename from `available_backgrounds` defensively, but a dedicated directory means there's no reason to rely on that exclusion in the first place |
 | `glitch_enabled` | Deployment-wide switch for the title glitch/jitter/color-cycle + pearl border effects. Defaults to `false` so a fresh clone with no `content_config.json` renders a plain watch page. Not gated by the per-link `flavor_enabled` DB column — only the deployment-wide switch matters here |
 | `background_enabled` | Deployment-wide switch for the fullscreen background. Independent of the other three switches; combined with the per-link `flavor_enabled` DB column (both must be true) |
 | `logo_flash_enabled` | Deployment-wide switch for the logo overlay. Same combination rule as `background_enabled` |
@@ -229,6 +229,12 @@ The two files behave differently once written:
 To make "saved but not yet active" visible in the UI, `GET /api/admin/settings` also returns `env_pending`: a list of key names where the on-disk `.env` value differs from what's actually active in the running process (compared via `dotenv_values()`, which parses the file without touching `os.environ`). The frontend marks those fields with a `*`. This comparison never needs to expose either value for the two secret fields (`JELLYFIN_API_KEY`, `ADMIN_TOKEN`) — it only returns whether they differ, not what they are.
 
 Secrets are masked in the GET response (a placeholder, not the real value) and skipped on write if the PUT echoes that same placeholder back unchanged — only a genuinely different submitted value (including an explicit empty string) overwrites one.
+
+**Docker-specific caveats**:
+
+- `ENV_PATH`/`_CONFIG_PATH` are computed relative to the app's own location (`/app/.env`, `/app/content_config.json` inside a container). `docker-compose.yml`'s `env_file: .env` only injects variables into the container's environment at creation time — it does not give the container a live view of the host file. Without an explicit bind mount for both files, a write from the settings page lands only on the container's own throwaway filesystem layer and is silently lost the next time the container is recreated (`docker compose down` + `up`), even though `env_pending` correctly showed it as saved right up until that point. `docker-compose.yml` mounts both files for exactly this reason.
+- Writing `.env` uses a custom in-place writer (`_write_env_file()` in `app/routes/settings.py`), not `python-dotenv`'s `set_key()`. `set_key()` writes via a temp-file-plus-`os.replace()` swap — correct and crash-safe for a normal file, but it fails with `OSError: Invalid cross-device link` against a single-file bind mount, since the temp file (created in the same directory) and the bind-mounted target end up on different filesystems and a cross-device rename isn't possible.
+- Docker auto-creates a missing bind-mount source as an empty **directory**, not a file. `content_config.py`'s `_load()` checks `os.path.isfile()`, not `os.path.exists()`, specifically so this auto-created directory is treated the same as a genuinely absent file (falls back to defaults) instead of crashing on `open()`. `save_content_config()` similarly checks this and raises a clear `RuntimeError` (surfaced as a proper error response, not a crash) if asked to write before a real file exists at that path.
 
 ---
 

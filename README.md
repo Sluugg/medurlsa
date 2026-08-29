@@ -1,4 +1,4 @@
-# web_share_app
+# medurlsa
 
 A lightweight web app for generating public share links to media in a Jellyfin library. Share links stream media directly in the browser without exposing your Jellyfin API key or session credentials.
 
@@ -48,8 +48,8 @@ apk del gcc musl-dev libffi-dev python3-dev
 ### 1. Clone and configure (both options)
 
 ```bash
-git clone https://your-gitea/username/web_share_app.git
-cd web_share_app
+git clone https://your-gitea/username/medurlsa.git
+cd medurlsa
 cp .env.example .env
 ```
 
@@ -75,7 +75,11 @@ No manual setup needed for `./data`/`./backgrounds` — the container runs as a 
 
 This builds the image (frontend assets are built inside a throwaway Node stage, not on your host), starts the container listening on `8000` inside, and maps it to `8000` on the host — edit the `ports:` line in `docker-compose.yml` if you want a different host port, or put a reverse proxy in front for TLS/port 80/443. `./data` and `./backgrounds` are bind-mounted so links and background files persist across rebuilds. A single worker is used inside the container for the same reason as the native install (see below).
 
-To use a custom `content_config.json` (site title, logo, flavor text, timing), copy `content_config.example.json` to `content_config.json` first, then uncomment its volume line in `docker-compose.yml` — Docker will mount an empty directory instead of a file if the source doesn't exist yet, which breaks config loading.
+`.env` is bind-mounted too (not just referenced via `env_file:`), so changes made through the admin settings page persist across `docker compose down`/`up` — `env_file:` alone only injects variables when the container is created, it doesn't give the container a live view of the file, so without the mount a settings-page save would silently vanish the next time the container is recreated.
+
+`content_config.json` (site title, logo, flavor text, timing) is bind-mounted too, and works fine with no setup — if it doesn't exist on the host yet, the app just uses its built-in defaults, same as a native install. If you want to *save* content_config changes through the admin settings page, though, create a real file first: `cp content_config.example.json content_config.json`. Without that, a save would fail with a clear error rather than silently vanishing — Docker auto-creates a missing bind-mount source as an empty directory, and there's no file there yet for the settings page to write into.
+
+`logo_path` needs to point somewhere the container can actually see — use `./branding` (bind-mounted, created automatically), not the bare project root, which isn't visible to the container at all. Deliberately a separate directory from `./backgrounds`: that one is scanned wholesale for the background picker and random background selection, so a logo dropped in there would show up as a selectable (and randomly pickable) background too. Set `logo_path` to e.g. `branding/logo.png`.
 
 ### 2b. Native install
 
@@ -88,13 +92,13 @@ chmod +x start.sh
 
 This installs dependencies, builds the frontend, and starts the server on `0.0.0.0:80` in the foreground.
 
-For a persistent background service (systemd on Debian/Ubuntu, OpenRC on Alpine), run `install.sh` as root instead — it creates a dedicated `webshare` service user, installs and enables the service, and scaffolds `.env` for you if it doesn't already exist:
+For a persistent background service (systemd on Debian/Ubuntu, OpenRC on Alpine), run `install.sh` as root instead — it creates a dedicated `medurlsa` service user, installs and enables the service, and scaffolds `.env` for you if it doesn't already exist:
 
 ```bash
 sudo ./install.sh
 ```
 
-The `install.sh` service runs on **port 8000**, not 80 — this lets it run as the unprivileged `webshare` user without needing root capabilities. Put a reverse proxy (nginx, Caddy) in front to expose it on 80/443. `start.sh`, by contrast, binds port 80 directly for a quick foreground run, which does need `sudo` (or running as root) on Linux.
+The `install.sh` service runs on **port 8000**, not 80 — this lets it run as the unprivileged `medurlsa` user without needing root capabilities. Put a reverse proxy (nginx, Caddy) in front to expose it on 80/443. `start.sh`, by contrast, binds port 80 directly for a quick foreground run, which does need `sudo` (or running as root) on Linux.
 
 ### 3. Access
 
@@ -120,3 +124,14 @@ cd frontend && npm run dev   # serves on http://localhost:5173
 - The SQLite database is created automatically at first run in the `data/` directory (or `/app/data` inside the Docker container, bind-mounted to `./data` on the host)
 - The `data/` and `backgrounds/` directories, `.env`, and `content_config.json` are all gitignored — back them up separately
 - Only one server process is supported (SQLite limitation) — sufficient for personal/small use. This also means the app can't be horizontally scaled by running multiple container replicas against the same database file.
+
+## Support
+
+If this project is useful to you, consider supporting its development:
+
+- ☕ [Ko-fi](https://ko-fi.com/sluugg)
+- Ethereum: `0x6613e260DE9a165B287C3B77f191c2A83B25B749`
+
+## License
+
+MIT — see [LICENSE](LICENSE).
