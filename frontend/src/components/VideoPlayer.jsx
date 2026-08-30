@@ -5,30 +5,39 @@
  *     Plain <video> or <audio> element.  The browser drives seeking via HTTP
  *     Range headers which the proxy forwards to Jellyfin unchanged.
  *
- *   HLS transcoded audio (needsTranscode=true):
+ *   HLS transcoded (needsTranscode=true):
  *     hls.js fetches the rewritten m3u8 playlist from /api/hls/{uuid}/playlist.m3u8
- *     and loads each fMP4 segment on demand.  Seeking is instant within cached
- *     segments and requires only a few seconds of new transcoding for uncached
- *     positions.  Buffer management is handled per-segment so no MSE quota
- *     issues arise regardless of track length.
+ *     and loads each segment on demand.  Used for audio items with an
+ *     incompatible codec (transcodes the whole stream to AAC) and for video
+ *     items with an incompatible embedded audio codec, e.g. DTS/EAC3/TrueHD
+ *     (remuxes with the video track copied untouched, only audio transcoded).
+ *     Seeking is instant within cached segments and requires only a few
+ *     seconds of new transcoding for uncached positions.  Buffer management
+ *     is handled per-segment so no MSE quota issues arise regardless of length.
  *     Safari uses its native HLS support instead of hls.js.
  */
 import { useEffect, useRef } from 'react'
 
-// hls.js is only ever needed for the transcoded-audio path below — a plain
+// hls.js is only ever needed for the transcoded path below — a plain
 // <video>/<audio> element handles every other case via direct Range-request
 // passthrough. Dynamically imported so its ~30-40KB (gzipped) doesn't ship
 // to every visitor, only the ones who actually hit a transcode-needed track.
 
-// ── HLS audio player (transcoded path) ───────────────────────────────────────
+// ── HLS player (transcoded path) ─────────────────────────────────────────────
 
-async function mountHlsAudio(container, playlistUrl, savedVolume) {
-  const audio = document.createElement('audio')
-  audio.controls    = true
-  audio.style.width = '100%'
-  audio.className   = 'w-full rounded'
-  if (savedVolume !== null) audio.volume = parseFloat(savedVolume)
-  container.appendChild(audio)
+async function mountHls(container, playlistUrl, savedVolume, isVideo) {
+  const el = document.createElement(isVideo ? 'video' : 'audio')
+  el.controls    = true
+  el.style.width = '100%'
+  if (isVideo) {
+    el.style.maxHeight = '75vh'
+    el.style.background = '#000'
+    el.className = 'rounded-lg shadow-xl'
+  } else {
+    el.className = 'w-full rounded'
+  }
+  if (savedVolume !== null) el.volume = parseFloat(savedVolume)
+  container.appendChild(el)
 
   let hls = null
   const { default: Hls } = await import('hls.js')
@@ -40,14 +49,14 @@ async function mountHlsAudio(container, playlistUrl, savedVolume) {
       backBufferLength: 60,
     })
     hls.loadSource(playlistUrl)
-    hls.attachMedia(audio)
+    hls.attachMedia(el)
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
-      audio.play().catch(() => {})
+      el.play().catch(() => {})
     })
-  } else if (audio.canPlayType('application/vnd.apple.mpegurl')) {
+  } else if (el.canPlayType('application/vnd.apple.mpegurl')) {
     // Safari supports HLS natively — no hls.js needed
-    audio.src = playlistUrl
-    audio.play().catch(() => {})
+    el.src = playlistUrl
+    el.play().catch(() => {})
   }
 
   return function cleanup() {
@@ -55,8 +64,8 @@ async function mountHlsAudio(container, playlistUrl, savedVolume) {
       hls.destroy()
       hls = null
     }
-    audio.pause()
-    audio.src = ''
+    el.pause()
+    el.src = ''
   }
 }
 
@@ -80,15 +89,15 @@ export default function VideoPlayer({ streamUrl, isVideo, needsTranscode }) {
 
     const savedVolume = localStorage.getItem('player_volume')
 
-    // ── HLS transcoded audio ──────────────────────────────────────────────────
-    // mountHlsAudio is async (dynamic hls.js import) — if this effect re-runs
+    // ── HLS transcoded ────────────────────────────────────────────────────────
+    // mountHls is async (dynamic hls.js import) — if this effect re-runs
     // again before it resolves, `torndown` lets the late-arriving mount clean
     // itself up immediately instead of clobbering whatever ran after it.
-    if (!isVideo && needsTranscode) {
+    if (needsTranscode) {
       let torndown = false
-      mountHlsAudio(container, streamUrl, savedVolume).then(cleanup => {
+      mountHls(container, streamUrl, savedVolume, isVideo).then(cleanup => {
         if (torndown) { cleanup(); return }
-        const el = container.querySelector('audio')
+        const el = container.querySelector(isVideo ? 'video' : 'audio')
         if (el) {
           el.addEventListener('volumechange', () =>
             localStorage.setItem('player_volume', String(el.volume))

@@ -32,8 +32,11 @@ def _parse_item(item: dict) -> dict:
         "year":             item.get("ProductionYear"),
         "duration_seconds": int(ticks / 10_000_000) if ticks else None,
         "artist":           ", ".join(artists) if artists else None,
-        # Only populated when MediaStreams is included in the response (get_item, not search)
-        "needs_transcode":  _check_needs_transcode(item) if item_type == "Audio" else False,
+        # Only populated when MediaStreams is included in the response (get_item, not
+        # search) — applies to video items too, since ripped movies/episodes commonly
+        # carry surround audio (DTS, EAC3, TrueHD) that browsers can't decode natively,
+        # even though the video codec itself plays fine.
+        "needs_transcode":  _check_needs_transcode(item),
     }
 
 
@@ -178,8 +181,13 @@ def build_stream_url(
     Audio (incompatible codec, e.g. ALAC): transcode to raw ADTS AAC.
         StartTimeTicks lets Jellyfin begin encoding from an arbitrary position,
         which the MSE-based frontend player uses for seek support.
-    Video: static passthrough — transcoding video on-the-fly is expensive and
-        most containers served by Jellyfin are already browser-compatible.
+    Video (compatible audio codec): static passthrough — transcoding video on-the-fly
+        is expensive and most containers served by Jellyfin are already browser-compatible.
+    Video (incompatible audio codec, e.g. DTS/EAC3/TrueHD): this function still returns
+        static passthrough here — the frontend never actually fetches this URL for that
+        case, it goes through the HLS playlist route instead (app/routes/hls.py), which
+        remuxes with VideoCodec=copy&AudioCodec=aac so only the audio is transcoded.
+        Byte-range seeking against a live transcode is undefined, same reasoning as audio.
     """
     if item_type == "Audio" and needs_transcode:
         # MP3 (audio/mpeg) is used rather than AAC ADTS (audio/aac) because

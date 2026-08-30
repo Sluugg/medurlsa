@@ -102,10 +102,12 @@ export default function WatchPage() {
 
   // ── Player ─────────────────────────────────────────────────────────────────
   const isVideo        = media.item_type !== 'Audio'
-  const needsTranscode = !isVideo && (media.needs_transcode ?? false)
+  const needsTranscode = media.needs_transcode ?? false
 
-  // Transcoded audio uses the HLS playlist endpoint; everything else uses the
-  // direct stream proxy which forwards Range headers for native seeking.
+  // Anything needing transcode (incompatible audio codec — audio track itself
+  // for Audio items, or the embedded audio track for video) uses the HLS
+  // playlist endpoint; everything else uses the direct stream proxy which
+  // forwards Range headers for native seeking.
   const streamUrl = needsTranscode
     ? `/api/hls/${uuid}/playlist.m3u8?client_id=${encodeURIComponent(clientId)}`
     : `/api/stream/${uuid}?client_id=${encodeURIComponent(clientId)}`

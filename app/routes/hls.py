@@ -1,9 +1,11 @@
 """
-HLS proxy endpoints for transcoded audio streams.
+HLS proxy endpoints for transcoded audio/video streams.
 
 GET /api/hls/{uuid}/playlist.m3u8?client_id={id}
   - Validates the link and that the client is registered.
-  - Fetches Jellyfin's HLS playlist for the linked audio item.
+  - Fetches Jellyfin's HLS playlist for the linked item. Audio items transcode
+    the whole stream to AAC; video items pass VideoCodec=copy so only the
+    audio track is transcoded (the video codec is untouched, keeping this cheap).
   - Rewrites every segment / init-segment URI in the playlist so it routes
     through /api/hls/{uuid}/seg, keeping the Jellyfin URL and API key
     server-side and unreachable from the browser.
@@ -123,18 +125,31 @@ async def hls_playlist(
     link = await _validate_link_and_client(uuid, client_id, db)
 
     item_id       = link["item_id"]
+    item_type     = link["item_type"]
     device_id     = f"share-{uuid}"
     play_session  = uuid_lib.uuid4().hex
     media_source  = item_id
 
-    playlist_url = (
-        f"{JELLYFIN_URL}/Audio/{item_id}/main.m3u8"
-        f"?AudioCodec=aac"
-        f"&deviceId={quote(device_id)}"
-        f"&mediaSourceId={quote(media_source)}"
-        f"&playSessionId={play_session}"
-        f"&api_key={JELLYFIN_API_KEY}"
-    )
+    if item_type == "Audio":
+        playlist_url = (
+            f"{JELLYFIN_URL}/Audio/{item_id}/main.m3u8"
+            f"?AudioCodec=aac"
+            f"&deviceId={quote(device_id)}"
+            f"&mediaSourceId={quote(media_source)}"
+            f"&playSessionId={play_session}"
+            f"&api_key={JELLYFIN_API_KEY}"
+        )
+    else:
+        # VideoCodec=copy remuxes without re-encoding the video track — only
+        # the audio is transcoded, keeping this as cheap as the audio-only path.
+        playlist_url = (
+            f"{JELLYFIN_URL}/Videos/{item_id}/main.m3u8"
+            f"?VideoCodec=copy&AudioCodec=aac"
+            f"&deviceId={quote(device_id)}"
+            f"&mediaSourceId={quote(media_source)}"
+            f"&playSessionId={play_session}"
+            f"&api_key={JELLYFIN_API_KEY}"
+        )
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         r = await client.get(playlist_url)
