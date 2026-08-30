@@ -9,7 +9,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # ── Runtime stage ─────────────────────────────────────────────────────────────
-FROM python:3.12-slim AS runtime
+FROM python:3.14-slim AS runtime
 WORKDIR /app
 
 # Dedicated non-root user — mirrors install.sh's native systemd/OpenRC setup.
