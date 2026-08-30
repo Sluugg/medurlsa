@@ -1,0 +1,236 @@
+#!/bin/sh
+# install.sh — installs dependencies, builds the frontend, and configures a
+# system service for medurlsa. Detects Alpine (OpenRC) and Debian/Ubuntu
+# (systemd) automatically. Must be run as root.
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+APP_DIR="$SCRIPT_DIR"
+SERVICE_NAME="medurlsa"
+SERVICE_USER="medurlsa"
+UVICORN="$APP_DIR/.venv/bin/uvicorn"
+LOG_DIR="/var/log/$SERVICE_NAME"
+
+# ── Colour helpers ────────────────────────────────────────────────────────────
+info()  { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
+ok()    { printf '\033[1;32m OK\033[0m %s\n' "$*"; }
+warn()  { printf '\033[1;33mWARN\033[0m %s\n' "$*"; }
+die()   { printf '\033[1;31mERR\033[0m %s\n' "$*" >&2; exit 1; }
+
+# ── Root check ────────────────────────────────────────────────────────────────
+[ "$(id -u)" -eq 0 ] || die "This script must be run as root."
+
+# ── Detect OS ─────────────────────────────────────────────────────────────────
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    OS_ID="$ID"
+    OS_LIKE="${ID_LIKE:-}"
+else
+    die "Cannot detect OS: /etc/os-release not found."
+fi
+
+case "$OS_ID" in
+    alpine)
+        PLATFORM="alpine"
+        ;;
+    debian|ubuntu|raspbian)
+        PLATFORM="debian"
+        ;;
+    *)
+        # Catch derivatives (e.g. Linux Mint, Pop!_OS) via ID_LIKE
+        case "$OS_LIKE" in
+            *debian*|*ubuntu*)
+                PLATFORM="debian"
+                ;;
+            *)
+                die "Unsupported OS: $OS_ID. Supported platforms: Alpine, Debian, Ubuntu."
+                ;;
+        esac
+        ;;
+esac
+
+info "Detected platform: $PLATFORM ($OS_ID)"
+
+# ── Install system dependencies ───────────────────────────────────────────────
+info "Installing system dependencies..."
+
+case "$PLATFORM" in
+    alpine)
+        apk add --no-cache python3 py3-pip nodejs npm
+        ;;
+    debian)
+        apt-get update -qq
+        apt-get install -y python3 python3-venv python3-pip nodejs npm
+        ;;
+esac
+
+ok "System dependencies installed."
+
+# ── Create service user ───────────────────────────────────────────────────────
+info "Creating service user '$SERVICE_USER'..."
+
+case "$PLATFORM" in
+    alpine)
+        # Ensure the group exists — adduser -S does not create a matching group automatically
+        grep -q "^${SERVICE_USER}:" /etc/group 2>/dev/null \
+            || addgroup -S "$SERVICE_USER" \
+            || die "Failed to create group '$SERVICE_USER'."
+
+        if id "$SERVICE_USER" >/dev/null 2>&1; then
+            # User exists — check primary group is the service group
+            EXPECTED_GID=$(grep "^${SERVICE_USER}:" /etc/group | cut -d: -f3)
+            ACTUAL_GID=$(id -g "$SERVICE_USER")
+            if [ "$ACTUAL_GID" != "$EXPECTED_GID" ]; then
+                warn "User '$SERVICE_USER' has wrong primary group — recreating..."
+                deluser "$SERVICE_USER" || die "Failed to remove existing '$SERVICE_USER' user."
+                adduser -S -H -G "$SERVICE_USER" -s /sbin/nologin "$SERVICE_USER" \
+                    || die "Failed to recreate user '$SERVICE_USER'."
+            else
+                ok "User '$SERVICE_USER' already exists with correct group, skipping."
+            fi
+        else
+            adduser -S -H -G "$SERVICE_USER" -s /sbin/nologin "$SERVICE_USER" \
+                || die "Failed to create user '$SERVICE_USER'."
+        fi
+        ;;
+    debian)
+        if id "$SERVICE_USER" >/dev/null 2>&1; then
+            ok "User '$SERVICE_USER' already exists, skipping."
+        else
+            useradd --system --no-create-home --shell /usr/sbin/nologin "$SERVICE_USER" \
+                || die "Failed to create user '$SERVICE_USER'."
+        fi
+        ;;
+esac
+
+id "$SERVICE_USER" >/dev/null 2>&1 || die "User '$SERVICE_USER' not found after creation. Check output above."
+ok "User '$SERVICE_USER' ready."
+
+# ── Python venv + dependencies ────────────────────────────────────────────────
+info "Setting up Python virtual environment..."
+cd "$APP_DIR"
+python3 -m venv --clear .venv
+.venv/bin/pip install --quiet --upgrade pip
+.venv/bin/pip install --quiet -r requirements.txt
+ok "Python dependencies installed."
+
+# ── Frontend build ────────────────────────────────────────────────────────────
+info "Building frontend..."
+cd "$APP_DIR/frontend"
+npm install --silent
+npm run build --silent
+cd "$APP_DIR"
+ok "Frontend built."
+
+# ── Runtime directories ───────────────────────────────────────────────────────
+info "Creating runtime directories..."
+mkdir -p "$APP_DIR/data"
+mkdir -p "$APP_DIR/backgrounds"
+mkdir -p "$LOG_DIR"
+ok "Directories ready."
+
+# ── .env scaffolding ──────────────────────────────────────────────────────────
+if [ ! -f "$APP_DIR/.env" ]; then
+    info "Creating .env from template..."
+    cat > "$APP_DIR/.env" <<EOF
+JELLYFIN_URL=http://your-jellyfin-server:8096
+JELLYFIN_API_KEY=your_api_key_here
+ADMIN_TOKEN=change_this_to_a_strong_password
+PUBLIC_BASE_URL=http://your-public-domain-or-ip
+DB_PATH=$APP_DIR/data/links.db
+BACKGROUNDS_DIR=$APP_DIR/backgrounds
+EOF
+    warn ".env created at $APP_DIR/.env — edit it before starting the service."
+else
+    ok ".env already exists, leaving it untouched."
+fi
+
+# ── File ownership and permissions ────────────────────────────────────────────
+info "Setting file ownership and permissions..."
+
+# App directory: owned by service user, not world-readable
+chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR"
+chmod 750 "$APP_DIR"
+
+# Secrets: readable only by the service user
+chmod 600 "$APP_DIR/.env"
+
+# Database directory: service user only
+chmod 700 "$APP_DIR/data"
+
+# Backgrounds: service user read/write (admin may drop files here)
+chmod 755 "$APP_DIR/backgrounds"
+
+# Log directory
+chown -R "$SERVICE_USER:$SERVICE_USER" "$LOG_DIR"
+chmod 750 "$LOG_DIR"
+
+ok "Permissions set."
+
+# ── Service installation ──────────────────────────────────────────────────────
+case "$PLATFORM" in
+
+    alpine)
+        info "Installing OpenRC service..."
+        cat > "/etc/init.d/$SERVICE_NAME" <<EOF
+#!/sbin/openrc-run
+
+name="$SERVICE_NAME"
+description="Medurlsa"
+directory="$APP_DIR"
+command="$UVICORN"
+command_args="app.main:app --host 0.0.0.0 --port 8000 --workers 1"
+command_user="$SERVICE_USER"
+pidfile="/run/\${RC_SVCNAME}.pid"
+command_background=true
+
+output_log="$LOG_DIR/out.log"
+error_log="$LOG_DIR/err.log"
+
+depend() {
+    need net
+    after firewall
+}
+EOF
+        chmod +x "/etc/init.d/$SERVICE_NAME"
+        rc-update add "$SERVICE_NAME" default
+        ok "OpenRC service installed and enabled."
+        info "Start now with:  rc-service $SERVICE_NAME start"
+        ;;
+
+    debian)
+        info "Installing systemd service..."
+        cat > "/etc/systemd/system/$SERVICE_NAME.service" <<EOF
+[Unit]
+Description=Medurlsa
+After=network.target
+
+[Service]
+Type=simple
+User=$SERVICE_USER
+Group=$SERVICE_USER
+WorkingDirectory=$APP_DIR
+ExecStart=$UVICORN app.main:app --host 0.0.0.0 --port 8000 --workers 1
+Restart=on-failure
+StandardOutput=append:$LOG_DIR/out.log
+StandardError=append:$LOG_DIR/err.log
+
+[Install]
+WantedBy=multi-user.target
+EOF
+        systemctl daemon-reload
+        systemctl enable "$SERVICE_NAME"
+        ok "systemd service installed and enabled."
+        info "Start now with:  systemctl start $SERVICE_NAME"
+        ;;
+
+esac
+
+echo ""
+ok "Installation complete."
+printf '    App directory:  %s\n' "$APP_DIR"
+printf '    Service user:   %s\n' "$SERVICE_USER"
+printf '    Logs:           %s\n' "$LOG_DIR"
+printf '    .env:           %s/.env\n' "$APP_DIR"
+echo ""
+warn "Edit .env before starting the service if you have not done so already."

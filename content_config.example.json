@@ -1,0 +1,60 @@
+{
+  "site_title": "medurlsa",
+  "logo_path": "/path/to/your/logo.png",
+  "glitch_enabled": true,
+  "background_enabled": true,
+  "logo_flash_enabled": true,
+  "flavor_text_enabled": true,
+  "flavor_texts": [
+    "rewinding...",
+    "tracking...",
+    "signal lost",
+    "...please stand by",
+    "no signal",
+    "be kind, rewind",
+    "now playing"
+  ],
+  "fonts": {
+    "title": {
+      "family": "'VCROSDMono', 'Courier New', monospace",
+      "size": "1.25rem",
+      "weight": "bold"
+    },
+    "flavor_text": {
+      "family": "'VCROSDMono', 'Courier New', monospace",
+      "size": "0.7rem",
+      "weight": "normal"
+    }
+  },
+  "timing": {
+    "pearl_border": {
+      "cycle_rate_s": 8,
+      "border_width_px": 2
+    },
+    "jitter": {
+      "delay_ms": 300,
+      "distance_px": 4
+    },
+    "glitch": {
+      "interval_min_s": 8,
+      "interval_max_s": 20,
+      "duration_ms": 400
+    },
+    "color_cycle": {
+      "interval_min_s": 15,
+      "interval_max_s": 40,
+      "duration_ms": 3000,
+      "rate_ms": 300
+    },
+    "flavor_text": {
+      "interval_min_s": 12,
+      "interval_max_s": 25,
+      "duration_ms": 4000
+    },
+    "logo_flash": {
+      "interval_min_s": 20,
+      "interval_max_s": 60,
+      "duration_ms": 3000
+    }
+  }
+}
