@@ -7,6 +7,7 @@ content_config.json
 __pycache__/
 *.pyc
 *.pyo
+.pytest_cache/
 .venv/
 venv/
 frontend/node_modules/

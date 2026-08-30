@@ -7,8 +7,8 @@ from app.config import LINK_ID_LENGTH_MIN, LINK_ID_LENGTH_MAX
 class CreateLinkRequest(BaseModel):
     item_id: str
     expires_at: Optional[str] = None    # ISO 8601 datetime string, or null (no expiry)
-    max_uses: Optional[int] = None      # null = unlimited
-    max_clients: Optional[int] = None   # null = unlimited
+    max_uses: Optional[int] = Field(default=None, ge=1)     # null = unlimited; 0 would be falsy and silently mean "unlimited" too
+    max_clients: Optional[int] = Field(default=None, ge=1)  # null = unlimited; same reasoning
     notes: Optional[str] = None
     flavor_enabled: bool = True         # enable/disable all visual flavor features
     background: Optional[str] = None   # specific background filename, null = random

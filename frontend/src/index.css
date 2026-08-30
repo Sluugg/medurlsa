@@ -19,6 +19,7 @@
   font-family: 'VCROSDMono';
   src: url('/fonts/VCROSDMono.woff2') format('woff2'),
        url('/fonts/VCROSDMono.ttf')   format('truetype');
+  font-size: 2em;
   font-weight: normal;
   font-style:  normal;
   font-display: swap;

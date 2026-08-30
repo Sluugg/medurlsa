@@ -125,6 +125,10 @@ cd frontend && npm run dev   # serves on http://localhost:5173
 - The `data/` and `backgrounds/` directories, `.env`, and `content_config.json` are all gitignored — back them up separately
 - Only one server process is supported (SQLite limitation) — sufficient for personal/small use. This also means the app can't be horizontally scaled by running multiple container replicas against the same database file.
 
+## Reporting a vulnerability
+
+Please don't open a public issue for security vulnerabilities. Use [GitHub's private vulnerability reporting](../../security/advisories/new) for this repository instead — it opens a private conversation with the maintainer so a fix can be worked out before any details go public.
+
 ## Support
 
 If this project is useful to you, consider supporting its development:

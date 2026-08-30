@@ -14,12 +14,15 @@
  *     Safari uses its native HLS support instead of hls.js.
  */
 import { useEffect, useRef } from 'react'
-import Hls from 'hls.js'
 
+// hls.js is only ever needed for the transcoded-audio path below — a plain
+// <video>/<audio> element handles every other case via direct Range-request
+// passthrough. Dynamically imported so its ~30-40KB (gzipped) doesn't ship
+// to every visitor, only the ones who actually hit a transcode-needed track.
 
 // ── HLS audio player (transcoded path) ───────────────────────────────────────
 
-function mountHlsAudio(container, playlistUrl, savedVolume) {
+async function mountHlsAudio(container, playlistUrl, savedVolume) {
   const audio = document.createElement('audio')
   audio.controls    = true
   audio.style.width = '100%'
@@ -28,6 +31,7 @@ function mountHlsAudio(container, playlistUrl, savedVolume) {
   container.appendChild(audio)
 
   let hls = null
+  const { default: Hls } = await import('hls.js')
 
   if (Hls.isSupported()) {
     hls = new Hls({
@@ -77,15 +81,22 @@ export default function VideoPlayer({ streamUrl, isVideo, needsTranscode }) {
     const savedVolume = localStorage.getItem('player_volume')
 
     // ── HLS transcoded audio ──────────────────────────────────────────────────
+    // mountHlsAudio is async (dynamic hls.js import) — if this effect re-runs
+    // again before it resolves, `torndown` lets the late-arriving mount clean
+    // itself up immediately instead of clobbering whatever ran after it.
     if (!isVideo && needsTranscode) {
-      const cleanup = mountHlsAudio(container, streamUrl, savedVolume)
-      const el = container.querySelector('audio')
-      if (el) {
-        el.addEventListener('volumechange', () =>
-          localStorage.setItem('player_volume', String(el.volume))
-        )
-      }
-      cleanupRef.current = cleanup
+      let torndown = false
+      mountHlsAudio(container, streamUrl, savedVolume).then(cleanup => {
+        if (torndown) { cleanup(); return }
+        const el = container.querySelector('audio')
+        if (el) {
+          el.addEventListener('volumechange', () =>
+            localStorage.setItem('player_volume', String(el.volume))
+          )
+        }
+        cleanupRef.current = cleanup
+      })
+      cleanupRef.current = () => { torndown = true }
       return
     }
 

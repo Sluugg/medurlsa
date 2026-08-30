@@ -46,6 +46,24 @@ if os.getenv("DEV_MODE"):
         allow_headers=["*"],
     )
 
+
+# Baseline security headers, applied by the app itself rather than assumed to
+# come from a reverse proxy — this app is explicitly supported running with a
+# direct port mapping and no proxy in front. SECURITY.md previously suggested
+# adding these at the proxy layer only; this is the same policy, just also
+# guaranteed present when there's no proxy at all.
+@app.middleware("http")
+async def add_security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; media-src 'self' blob:; img-src 'self' data:; "
+        "style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'"
+    )
+    return response
+
 # ── API routes ────────────────────────────────────────────────────────────────
 app.include_router(watch.router,               prefix="/api")
 app.include_router(stream.router,              prefix="/api")

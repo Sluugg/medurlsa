@@ -1,0 +1,43 @@
+# Gitea Actions equivalent of .github/workflows/ci.yml — kept deliberately
+# simpler: build/test verification only, no image publishing. GHCR is
+# GitHub-specific; pushing a built image somewhere from Gitea (e.g. its own
+# built-in package registry) would need separate credentials and is left out
+# here rather than assumed. Requires Gitea Actions to be enabled on the
+# instance and at least one runner registered — this does nothing on an
+# instance where that hasn't been set up.
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-dev.txt
+      - run: pytest -v
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-build]
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t medurlsa:ci .

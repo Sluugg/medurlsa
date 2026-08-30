@@ -703,6 +703,9 @@ function SettingsModal({ token, onClose }) {
 export default function AdminPage() {
   const [token, setToken]           = useState(() => sessionStorage.getItem('admin_token') ?? '')
   const [links, setLinks]           = useState([])
+  const [linksTotal, setLinksTotal] = useState(0)
+  const [linksPage, setLinksPage]   = useState(1)
+  const [linksPageSize, setLinksPageSize] = useState(25)
   const [searchQuery, setQuery]     = useState('')
   const [results, setResults]       = useState([])
   const [searching, setSearching]   = useState(false)
@@ -716,12 +719,24 @@ export default function AdminPage() {
 
   const isLoggedIn = !!token
 
-  async function loadLinks(t = token) {
-    const r = await fetch('/api/admin/links', { headers: authHeaders(t) })
-    if (r.ok) setLinks(await r.json())
+  async function loadLinks(t = token, page = linksPage, pageSize = linksPageSize) {
+    const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+    const r = await fetch(`/api/admin/links?${params}`, { headers: authHeaders(t) })
+    if (r.ok) {
+      const data = await r.json()
+      // Deleting the last item on a page you're not on page 1 of would
+      // otherwise strand you on a now-empty page — step back one instead.
+      if (data.links.length === 0 && data.page > 1 && data.total > 0) {
+        return loadLinks(t, data.page - 1, pageSize)
+      }
+      setLinks(data.links)
+      setLinksTotal(data.total)
+      setLinksPage(data.page)
+      setLinksPageSize(data.page_size)
+    }
   }
 
-  useEffect(() => { if (isLoggedIn) loadLinks() }, [isLoggedIn])
+  useEffect(() => { if (isLoggedIn) loadLinks(token, 1, linksPageSize) }, [isLoggedIn])
 
   useEffect(() => {
     if (!isLoggedIn) return
@@ -887,7 +902,21 @@ export default function AdminPage() {
       <section className="bg-gray-900 border border-gray-700 rounded-xl p-5 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">Active Shares</h2>
-          <button onClick={() => loadLinks()} className="text-xs text-gray-400 hover:text-white">Refresh</button>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-1.5 text-xs text-gray-400">
+              Per page
+              <select
+                value={linksPageSize}
+                onChange={e => loadLinks(token, 1, Number(e.target.value))}
+                className="bg-gray-800 border border-gray-600 rounded px-1.5 py-0.5 text-white text-xs focus:outline-none focus:border-blue-500"
+              >
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </label>
+            <button onClick={() => loadLinks()} className="text-xs text-gray-400 hover:text-white">Refresh</button>
+          </div>
         </div>
 
         {links.length === 0 ? (
@@ -951,6 +980,26 @@ export default function AdminPage() {
             </table>
           </div>
         )}
+
+        {linksTotal > linksPageSize && (
+          <div className="flex items-center justify-between pt-1">
+            <p className="text-xs text-gray-500">
+              Showing {(linksPage - 1) * linksPageSize + 1}–{Math.min(linksPage * linksPageSize, linksTotal)} of {linksTotal}
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => loadLinks(token, linksPage - 1, linksPageSize)}
+                disabled={linksPage <= 1}
+                className="text-xs bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:hover:bg-gray-700 text-white rounded px-3 py-1"
+              >Previous</button>
+              <button
+                onClick={() => loadLinks(token, linksPage + 1, linksPageSize)}
+                disabled={linksPage * linksPageSize >= linksTotal}
+                className="text-xs bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:hover:bg-gray-700 text-white rounded px-3 py-1"
+              >Next</button>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Create link modal */}
@@ -959,7 +1008,7 @@ export default function AdminPage() {
           item={selectedItem}
           token={token}
           availableBackgrounds={config.available_backgrounds}
-          onCreated={() => { loadLinks(); setQuery(''); setResults([]) }}
+          onCreated={() => { loadLinks(token, 1, linksPageSize); setQuery(''); setResults([]) }}
           onClose={() => setSelected(null)}
         />
       )}

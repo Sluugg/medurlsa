@@ -14,6 +14,7 @@ Future (multi-user):
   - The route signatures don't need to change — only this module.
 """
 
+import secrets
 import time
 from collections import defaultdict
 
@@ -68,7 +69,7 @@ def _verify_token(token: str) -> str:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="ADMIN_TOKEN is not configured on the server.",
         )
-    if token != ADMIN_TOKEN:
+    if not secrets.compare_digest(token, ADMIN_TOKEN):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid admin token.",

@@ -114,18 +114,33 @@ async def create_link(
     }
 
 
+_PAGE_SIZES = (25, 50, 100)
+
+
 @router.get("/admin/links")
 async def list_links(
+    page: int = 1,
+    page_size: int = 25,
     db: Connection = Depends(get_db),
     _: str = Depends(require_admin),
 ):
-    """Return all share links with client count and computed status."""
+    """Return one page of share links with client count and computed status."""
+    if page_size not in _PAGE_SIZES:
+        page_size = 25
+    page = max(page, 1)
+    offset = (page - 1) * page_size
+
+    async with db.execute("SELECT COUNT(*) AS cnt FROM share_links") as cur:
+        total = (await cur.fetchone())["cnt"]
+
     async with db.execute(
         """SELECT
                sl.*,
                (SELECT COUNT(*) FROM link_clients lc WHERE lc.link_uuid = sl.uuid) AS client_count
            FROM share_links sl
-           ORDER BY sl.created_at DESC"""
+           ORDER BY sl.created_at DESC
+           LIMIT ? OFFSET ?""",
+        (page_size, offset),
     ) as cur:
         rows = await cur.fetchall()
 
@@ -134,7 +149,8 @@ async def list_links(
         d = dict(row)
         d["url"] = f"{PUBLIC_BASE_URL}/stream/{d['uuid']}"
         links.append(d)
-    return links
+
+    return {"links": links, "total": total, "page": page, "page_size": page_size}
 
 
 @router.delete("/admin/links/{uuid}", status_code=200)
