@@ -12,6 +12,24 @@ A lightweight web app for generating public share links to media in a Jellyfin l
 - Viewers are tracked by a browser-generated ID (stored in localStorage) — no accounts or logins required for viewers
 - Expired or exhausted links show a clear message rather than a generic error
 
+## Quick start
+
+Requires a Jellyfin server with a dedicated service account API key. This gets you running under Docker; see [Deployment](#deployment) below for native installs and full configuration details.
+
+```bash
+git clone https://your-gitea/username/medurlsa.git
+cd medurlsa
+cp .env.example .env
+```
+
+Edit `.env` and set `JELLYFIN_URL`, `JELLYFIN_API_KEY`, `ADMIN_TOKEN`, and `PUBLIC_BASE_URL`, then:
+
+```bash
+docker compose up -d --build
+```
+
+Open `http://your-server:8000/admin`, log in with your `ADMIN_TOKEN`, and generate your first share link.
+
 ## Requirements
 
 - A Jellyfin server with a dedicated service account API key
